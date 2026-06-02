@@ -64,6 +64,31 @@ Your path may be different. Check with:
 Get-Command git -All
 ```
 
+## For Codex / AI Agents
+
+If you are using Codex or another AI coding agent, give it this prompt:
+
+```text
+I am on Windows and the Codex desktop app is flashing git.exe console windows during tasks.
+
+Please install this temporary workaround:
+https://github.com/rwang23/codex-windows-git-wrapper
+
+Requirements:
+- Do not replace or rename my real Git executable.
+- Do not copy the wrapper into my Git installation directory.
+- Do not modify system PATH or user PATH.
+- Clone the repo locally.
+- Run scripts\install.ps1.
+- If Git auto-detection fails, run Get-Command git -All and pass the real Git path with -RealGit.
+- Run scripts\status.ps1 and confirm persistent user/machine PATH do not contain codex-git-wrapper.
+- Do not run scripts\start-codex-with-git-wrapper.ps1 -Force from inside an active Codex task.
+- Tell me the exact external PowerShell command I should run to start Codex with the wrapper.
+- Tell me the exact remove command for rollback.
+```
+
+The agent should install and verify the workaround, then give you the external PowerShell command to start Codex. It should not run the `-Force` launcher from inside Codex, because that closes Codex and may interrupt the session.
+
 ## Start Codex With The Wrapper
 
 Close Codex completely, then run:
@@ -131,4 +156,3 @@ No Git installation files need to be restored because this workaround never chan
 - Do not rename or replace your real `git.exe`.
 - Do not add the wrapper directory to persistent user or machine `PATH`.
 - Remove this workaround after Codex fixes the Windows Git process launch behavior upstream.
-
