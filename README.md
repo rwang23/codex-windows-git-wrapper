@@ -64,6 +64,28 @@ Your path may be different. Check with:
 Get-Command git -All
 ```
 
+## One Command Setup And Launch
+
+If you already cloned this repository locally, run this from an external PowerShell window:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -Force
+```
+
+Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
+
+If you want a clone-or-update command that works from any directory:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-git-wrapper'; if (!(Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-git-wrapper.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
+```
+
+If Git is installed in a custom location, pass `-RealGit`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -RealGit "C:\Program Files\Git\cmd\git.exe" -Force
+```
+
 ## For Codex / AI Agents
 
 If you are using Codex or another AI coding agent, give it this prompt:
@@ -79,10 +101,11 @@ Requirements:
 - Do not copy the wrapper into my Git installation directory.
 - Do not modify system PATH or user PATH.
 - Clone the repo locally.
-- Run scripts\install.ps1.
+- Run scripts\setup-and-start.ps1 only if I explicitly ask you to restart Codex.
+- Otherwise run scripts\install.ps1.
 - If Git auto-detection fails, run Get-Command git -All and pass the real Git path with -RealGit.
 - Run scripts\status.ps1 and confirm persistent user/machine PATH do not contain codex-git-wrapper.
-- Do not run scripts\start-codex-with-git-wrapper.ps1 -Force from inside an active Codex task.
+- Do not run scripts\setup-and-start.ps1 -Force or scripts\start-codex-with-git-wrapper.ps1 -Force from inside an active Codex task.
 - Tell me the exact external PowerShell command I should run to start Codex with the wrapper.
 - Tell me the exact remove command for rollback.
 ```
@@ -106,6 +129,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-with-git-wrapper.
 ```
 
 Do not run the `-Force` command from inside an active Codex task, because it will close Codex.
+
+The combined install/check/start script is:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -Force
+```
 
 ## Check Status
 
