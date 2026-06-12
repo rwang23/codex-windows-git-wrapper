@@ -6,6 +6,7 @@ $ErrorActionPreference = "Stop"
 
 $wrapper = Join-Path $InstallDir "git.exe"
 $config = Join-Path $InstallDir "real-git.txt"
+$kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
 $package = Get-AppxPackage -Name OpenAI.Codex -ErrorAction SilentlyContinue |
     Sort-Object Version -Descending |
     Select-Object -First 1
@@ -25,6 +26,11 @@ if (Test-Path -LiteralPath $wrapper) {
     Write-Output "  Present: yes"
     Write-Output "  Path: $($item.FullName)"
     Write-Output "  LastWriteTime: $($item.LastWriteTime)"
+    if (Test-Path -LiteralPath $kindConfig) {
+        Write-Output "  Build: $((Get-Content -LiteralPath $kindConfig -Raw).Trim())"
+    } else {
+        Write-Output "  Build: unknown"
+    }
 } else {
     Write-Output "  Present: no"
 }
@@ -75,4 +81,3 @@ if ($runningCodex) {
 } else {
     Write-Output "  None"
 }
-

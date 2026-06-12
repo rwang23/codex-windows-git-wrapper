@@ -21,6 +21,8 @@ The upstream fix should come from Codex launching Git with the appropriate Windo
 
 The wrapper is a tiny Windows GUI executable named `git.exe`. When Codex invokes `git`, the wrapper starts your real Git executable with `CREATE_NO_WINDOW`, then waits for Git to exit and returns the same exit code.
 
+When a native C++ compiler is available, the installer builds a native wrapper first. If no native compiler is available, it falls back to the managed C# wrapper.
+
 The wrapper target Git path is supplied by:
 
 1. `CODEX_REAL_GIT` environment variable set by the launcher.
@@ -30,7 +32,7 @@ The wrapper target Git path is supplied by:
 ## What This Does Not Do
 
 - It does not replace your installed Git.
-- It does not modify `C:\Program Files\Git`, `D:\Software\Git`, or any other Git install directory.
+- It does not modify your Git install directory.
 - It does not modify system or user `PATH`.
 - It does not modify the registry.
 - It does not reduce Codex's Git polling frequency.
@@ -69,7 +71,7 @@ Get-Command git -All
 If you already cloned this repository locally, run this from an external PowerShell window:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -Force
 ```
 
 Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
@@ -83,7 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:U
 If Git is installed in a custom location, pass `-RealGit`:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -RealGit "C:\Program Files\Git\cmd\git.exe" -Force
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -RealGit "C:\Program Files\Git\cmd\git.exe" -Force
 ```
 
 ## For Codex / AI Agents
@@ -150,6 +152,26 @@ This reports:
 - Current process Git resolution.
 - Whether persistent user or machine `PATH` contains the wrapper.
 - Running Codex processes.
+
+## Troubleshooting fondue.exe / Windows Features
+
+If a `Windows Features` window or `fondue.exe` appears after installing the wrapper, do not treat that as the normal fix path.
+
+`fondue.exe` is a Windows component used for feature-on-demand prompts. In this workaround, it can appear if the managed wrapper crashes while Windows is loading the .NET runtime. One known trigger is a broken or unavailable current working directory inherited from a Codex process. Current wrapper source avoids reading `Environment.CurrentDirectory` before launching Git.
+
+Recommended recovery:
+
+```powershell
+git pull --ff-only
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\status.ps1
+```
+
+Then close Codex completely and start it again with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\start-codex-with-git-wrapper.ps1
+```
 
 ## Remove
 

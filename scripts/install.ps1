@@ -30,6 +30,51 @@ function Find-Csc {
     throw "Could not find csc.exe. Install .NET Framework developer tools or Visual Studio Build Tools."
 }
 
+function Find-NativeCompiler {
+    foreach ($name in @("cl.exe", "clang.exe", "gcc.exe")) {
+        $command = Get-Command $name -ErrorAction SilentlyContinue
+        if ($command) {
+            return [pscustomobject]@{
+                Name = $name
+                Path = $command.Source
+            }
+        }
+    }
+
+    return $null
+}
+
+function Build-NativeWrapper {
+    param(
+        [string]$CompilerName,
+        [string]$CompilerPath,
+        [string]$Source,
+        [string]$Output,
+        [string]$BuildDir
+    )
+
+    New-Item -ItemType Directory -Force -Path $BuildDir | Out-Null
+    Push-Location $BuildDir
+    try {
+        if ($CompilerName -eq "cl.exe") {
+            & $CompilerPath /nologo /O2 /EHsc /DUNICODE /D_UNICODE "/Fe$Output" $Source /link /SUBSYSTEM:WINDOWS | Write-Output
+        } elseif ($CompilerName -eq "clang.exe") {
+            & $CompilerPath -O2 -municode -mwindows -o $Output $Source | Write-Output
+        } elseif ($CompilerName -eq "gcc.exe") {
+            & $CompilerPath -O2 -municode -mwindows -o $Output $Source | Write-Output
+        } else {
+            throw "Unsupported native compiler: $CompilerName"
+        }
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "Native wrapper compilation failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
 function Resolve-RealGit {
     param(
         [string]$RequestedRealGit,
@@ -84,26 +129,41 @@ function Resolve-RealGit {
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $source = Join-Path $repoRoot "src\GitHiddenWrapper.cs"
+$nativeSource = Join-Path $repoRoot "src\GitHiddenWrapper.cpp"
 if (-not (Test-Path -LiteralPath $source)) {
     throw "Wrapper source was not found: $source"
 }
 
 $resolvedRealGit = Resolve-RealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
 $gitVersion = & $resolvedRealGit --version
-$csc = Find-Csc
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 $output = Join-Path $InstallDir "git.exe"
-& $csc /nologo /target:winexe /optimize+ /out:$output $source
+$buildKind = "managed-csharp"
+$nativeCompiler = $null
+
+if (Test-Path -LiteralPath $nativeSource) {
+    $nativeCompiler = Find-NativeCompiler
+}
+
+if ($nativeCompiler) {
+    $buildKind = "native-$($nativeCompiler.Name)"
+    Build-NativeWrapper -CompilerName $nativeCompiler.Name -CompilerPath $nativeCompiler.Path -Source $nativeSource -Output $output -BuildDir (Join-Path $repoRoot "obj\native")
+} else {
+    $csc = Find-Csc
+    & $csc /nologo /target:winexe /optimize+ /out:$output $source
+}
 
 if (-not (Test-Path -LiteralPath $output)) {
     throw "Compilation failed. Wrapper was not created at $output"
 }
 
 Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolvedRealGit -Encoding ASCII
+Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
 
 Write-Output "Installed Codex Git wrapper."
 Write-Output "Wrapper:  $output"
+Write-Output "Build:    $buildKind"
 Write-Output "Real Git: $resolvedRealGit"
 Write-Output "Version:  $gitVersion"
 Write-Output ""

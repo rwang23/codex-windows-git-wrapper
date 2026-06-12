@@ -77,7 +77,7 @@ internal static class GitHiddenWrapper
             true,
             CreateNoWindow,
             IntPtr.Zero,
-            Environment.CurrentDirectory,
+            null,
             ref startupInfo,
             out processInfo))
         {
@@ -237,4 +237,3 @@ internal static class GitHiddenWrapper
         public int dwThreadId;
     }
 }
-
