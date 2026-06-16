@@ -1,5 +1,9 @@
+#ifndef UNICODE
 #define UNICODE
+#endif
+#ifndef _UNICODE
 #define _UNICODE
+#endif
 
 #include <windows.h>
 #include <shellapi.h>
@@ -59,7 +63,7 @@ static std::wstring ReadTextFile(const std::wstring& path) {
 
     std::string bytes(static_cast<size_t>(size.QuadPart), '\0');
     DWORD read = 0;
-    BOOL ok = ReadFile(file, bytes.data(), static_cast<DWORD>(bytes.size()), &read, nullptr);
+    BOOL ok = ReadFile(file, &bytes[0], static_cast<DWORD>(bytes.size()), &read, nullptr);
     CloseHandle(file);
     if (!ok) {
         return L"";
@@ -73,12 +77,12 @@ static std::wstring ReadTextFile(const std::wstring& path) {
             return L"";
         }
         std::wstring wide(wideLength, L'\0');
-        MultiByteToWideChar(CP_ACP, 0, bytes.data(), static_cast<int>(bytes.size()), wide.data(), wideLength);
+        MultiByteToWideChar(CP_ACP, 0, bytes.data(), static_cast<int>(bytes.size()), &wide[0], wideLength);
         return Trim(wide);
     }
 
     std::wstring wide(wideLength, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), wide.data(), wideLength);
+    MultiByteToWideChar(CP_UTF8, 0, bytes.data(), static_cast<int>(bytes.size()), &wide[0], wideLength);
     return Trim(wide);
 }
 
@@ -88,7 +92,7 @@ static std::wstring GetEnvironmentString(const wchar_t* name) {
         return L"";
     }
     std::wstring value(length, L'\0');
-    DWORD copied = GetEnvironmentVariableW(name, value.data(), length);
+    DWORD copied = GetEnvironmentVariableW(name, &value[0], length);
     if (copied == 0 || copied >= length) {
         return L"";
     }

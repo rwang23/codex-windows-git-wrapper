@@ -37,6 +37,44 @@ function Find-NativeCompiler {
             return [pscustomobject]@{
                 Name = $name
                 Path = $command.Source
+                EnvScript = $null
+            }
+        }
+    }
+
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+    $installPaths = @()
+    if (Test-Path -LiteralPath $vswhere) {
+        $detected = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if ($detected) {
+            $installPaths += $detected
+        }
+    }
+
+    $installPaths += @(
+        "C:\Program Files\Microsoft Visual Studio\2022\Community",
+        "C:\Program Files\Microsoft Visual Studio\2022\Professional",
+        "C:\Program Files\Microsoft Visual Studio\2022\Enterprise",
+        "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+    )
+
+    foreach ($installPath in ($installPaths | Select-Object -Unique)) {
+        $vcvars = Join-Path $installPath "VC\Auxiliary\Build\vcvars64.bat"
+        $toolsRoot = Join-Path $installPath "VC\Tools\MSVC"
+        if (-not (Test-Path -LiteralPath $vcvars) -or -not (Test-Path -LiteralPath $toolsRoot)) {
+            continue
+        }
+
+        $cl = Get-ChildItem -LiteralPath $toolsRoot -Recurse -Filter cl.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -like "*\bin\Hostx64\x64\cl.exe" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+
+        if ($cl) {
+            return [pscustomobject]@{
+                Name = "cl.exe"
+                Path = $cl.FullName
+                EnvScript = $vcvars
             }
         }
     }
@@ -48,6 +86,7 @@ function Build-NativeWrapper {
     param(
         [string]$CompilerName,
         [string]$CompilerPath,
+        [string]$EnvScript,
         [string]$Source,
         [string]$Output,
         [string]$BuildDir
@@ -57,7 +96,12 @@ function Build-NativeWrapper {
     Push-Location $BuildDir
     try {
         if ($CompilerName -eq "cl.exe") {
-            & $CompilerPath /nologo /O2 /EHsc /DUNICODE /D_UNICODE "/Fe$Output" $Source /link /SUBSYSTEM:WINDOWS | Write-Output
+            if ($EnvScript) {
+                $command = "call `"$EnvScript`" >nul && `"$CompilerPath`" /nologo /O2 /EHsc /DUNICODE /D_UNICODE /Fe`"$Output`" `"$Source`" /link /SUBSYSTEM:WINDOWS"
+                cmd.exe /c $command | Write-Output
+            } else {
+                & $CompilerPath /nologo /O2 /EHsc /DUNICODE /D_UNICODE "/Fe$Output" $Source /link /SUBSYSTEM:WINDOWS | Write-Output
+            }
         } elseif ($CompilerName -eq "clang.exe") {
             & $CompilerPath -O2 -municode -mwindows -o $Output $Source | Write-Output
         } elseif ($CompilerName -eq "gcc.exe") {
@@ -148,7 +192,7 @@ if (Test-Path -LiteralPath $nativeSource) {
 
 if ($nativeCompiler) {
     $buildKind = "native-$($nativeCompiler.Name)"
-    Build-NativeWrapper -CompilerName $nativeCompiler.Name -CompilerPath $nativeCompiler.Path -Source $nativeSource -Output $output -BuildDir (Join-Path $repoRoot "obj\native")
+    Build-NativeWrapper -CompilerName $nativeCompiler.Name -CompilerPath $nativeCompiler.Path -EnvScript $nativeCompiler.EnvScript -Source $nativeSource -Output $output -BuildDir (Join-Path $repoRoot "obj\native")
 } else {
     $csc = Find-Csc
     & $csc /nologo /target:winexe /optimize+ /out:$output $source
