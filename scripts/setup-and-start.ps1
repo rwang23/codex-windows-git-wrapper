@@ -1,5 +1,6 @@
 param(
     [switch]$Force,
+    [switch]$DisableShellSnapshot,
     [string]$RealGit,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
 )
@@ -42,6 +43,10 @@ $startArgs = @(
 
 if ($RealGit) {
     $startArgs += @("-RealGit", $RealGit)
+}
+
+if ($DisableShellSnapshot) {
+    $startArgs += "-DisableShellSnapshot"
 }
 
 $runningCodex = Get-Process -ErrorAction SilentlyContinue |

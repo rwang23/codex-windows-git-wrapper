@@ -51,11 +51,69 @@ if (Test-Path -LiteralPath $config) {
 
 Write-Output ""
 Write-Output "Current process git resolution:"
-$git = Get-Command git -ErrorAction SilentlyContinue
+$git = Get-Command git -All -ErrorAction SilentlyContinue
 if ($git) {
-    Write-Output "  $($git.Source)"
+    $git | ForEach-Object { Write-Output "  $($_.Source)" }
 } else {
     Write-Output "  git not found"
+}
+
+Write-Output ""
+Write-Output "Codex CLI:"
+$codex = Get-Command codex -All -ErrorAction SilentlyContinue
+if ($codex) {
+    $codex | ForEach-Object { Write-Output "  $($_.Source)" }
+    try {
+        Write-Output "  Version: $((& $codex[0].Source --version 2>$null).Trim())"
+    } catch {
+        Write-Output "  Version: unavailable"
+    }
+} else {
+    Write-Output "  codex not found"
+}
+
+Write-Output ""
+Write-Output "Codex shell_snapshot:"
+$configPath = Join-Path $env:USERPROFILE ".codex\config.toml"
+$featureLine = if (Test-Path -LiteralPath $configPath) {
+    Select-String -LiteralPath $configPath -Pattern '^\s*shell_snapshot\s*=' -ErrorAction SilentlyContinue |
+        Select-Object -Last 1
+}
+if ($featureLine) {
+    Write-Output "  $($featureLine.Line.Trim())"
+} else {
+    Write-Output "  Not explicitly configured (Codex default may be enabled)"
+}
+
+Write-Output ""
+Write-Output "Standalone CLI sandbox helpers:"
+$helperNames = @("codex-command-runner.exe", "codex-windows-sandbox-setup.exe")
+$npmHelperRoot = $null
+if ($codex) {
+    $npmHelperRoot = Join-Path (Split-Path $codex[0].Source -Parent) "node_modules\@openai\codex\node_modules\@openai\codex-win32-x64\vendor\x86_64-pc-windows-msvc"
+}
+$helperRoots = @(
+    (Join-Path $env:USERPROFILE ".codex\packages\standalone\current"),
+    (Join-Path $env:LOCALAPPDATA "OpenAI\Codex"),
+    $npmHelperRoot
+)
+$foundHelperRoot = $false
+foreach ($helperRoot in ($helperRoots | Select-Object -Unique)) {
+    if (Test-Path -LiteralPath $helperRoot) {
+        $foundHelperRoot = $true
+        Write-Output "  Root: $helperRoot"
+        foreach ($name in $helperNames) {
+            $matches = Get-ChildItem -LiteralPath $helperRoot -Recurse -File -Filter $name -ErrorAction SilentlyContinue
+            if ($matches) {
+                $matches | ForEach-Object { Write-Output "    $($_.FullName)" }
+            } else {
+                Write-Output "    ${name}: missing"
+            }
+        }
+    }
+}
+if (-not $foundHelperRoot) {
+    Write-Output "  No standalone/npm helper root found"
 }
 
 Write-Output ""

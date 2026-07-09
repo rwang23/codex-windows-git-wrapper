@@ -4,6 +4,8 @@ Temporary workaround for Windows Codex App users who see transient `git.exe` con
 
 This project is intentionally small and conservative. It does not patch Codex, replace Git, or change persistent system configuration. It only provides a launcher that starts Codex with a process-local `PATH` entry pointing to a small `git.exe` wrapper.
 
+For current Codex Desktop builds, the launcher can also disable the `shell_snapshot` feature. This is a separate Windows issue: Codex's background process polling can start visible PowerShell/conhost windows even when Git itself is wrapped.
+
 ## Problem
 
 On some Windows machines, the Codex desktop app repeatedly launches Git commands during task execution. Because Git for Windows `git.exe` is a console executable, a `git.exe` / console window may flash briefly if Codex starts it from a GUI process without hiding the console window.
@@ -73,6 +75,14 @@ If you already cloned this repository locally, run this from an external PowerSh
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -Force
 ```
+
+If Codex Desktop is flashing PowerShell/conhost windows, use the optional feature workaround:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -DisableShellSnapshot
+```
+
+This writes `shell_snapshot = false` to the Codex user configuration. Restart Codex after running it. It keeps the normal shell tool enabled, but disables the background shell/process snapshot loop.
 
 Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
 

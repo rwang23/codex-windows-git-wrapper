@@ -1,5 +1,6 @@
 param(
     [switch]$Force,
+    [switch]$DisableShellSnapshot,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper"),
     [string]$RealGit
 )
@@ -71,10 +72,25 @@ if ($runningCodex -and $Force) {
 $env:CODEX_REAL_GIT = $realGitPath
 $env:Path = "$InstallDir;$env:Path"
 
+if ($DisableShellSnapshot) {
+    $codexCommand = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $codexCommand) {
+        throw "The codex CLI was not found. Install or expose codex before using -DisableShellSnapshot."
+    }
+
+    Write-Output "Disabling shell_snapshot for the Codex user configuration..."
+    & $codexCommand.Source features disable shell_snapshot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not disable shell_snapshot. Exit code: $LASTEXITCODE"
+    }
+}
+
 Write-Output "Starting Codex with Git wrapper."
 Write-Output "Codex:   $codexExe"
 Write-Output "Wrapper: $wrapper"
 Write-Output "RealGit: $realGitPath"
+if ($DisableShellSnapshot) {
+    Write-Output "Feature: shell_snapshot disabled"
+}
 
 Start-Process -FilePath $codexExe -WorkingDirectory (Split-Path -Parent $codexExe)
-
