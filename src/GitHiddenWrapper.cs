@@ -40,21 +40,22 @@ internal static class GitHiddenWrapper
 
     private static int Main(string[] args)
     {
-        var realGit = ResolveRealGit();
-        if (string.IsNullOrWhiteSpace(realGit) || !File.Exists(realGit))
+        var target = ResolveTarget();
+        var realExecutable = ResolveRealExecutable(target);
+        if (string.IsNullOrWhiteSpace(realExecutable) || !File.Exists(realExecutable))
         {
-            SafeError("Real Git executable was not found. Set CODEX_REAL_GIT or reinstall the wrapper.");
+            SafeError("Real " + target.DisplayName + " executable was not found. Reinstall the wrapper.");
             return 1;
         }
 
         var self = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-        if (string.Equals(Path.GetFullPath(realGit), Path.GetFullPath(self), StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(Path.GetFullPath(realExecutable), Path.GetFullPath(self), StringComparison.OrdinalIgnoreCase))
         {
-            SafeError("Refusing to launch the wrapper recursively. Check CODEX_REAL_GIT or real-git.txt.");
+            SafeError("Refusing to launch the wrapper recursively. Check the configured real executable path.");
             return 1;
         }
 
-        var commandLine = new StringBuilder(QuoteArg(realGit));
+        var commandLine = new StringBuilder(QuoteArg(realExecutable));
         if (args.Length > 0)
         {
             commandLine.Append(' ');
@@ -70,7 +71,7 @@ internal static class GitHiddenWrapper
 
         PROCESS_INFORMATION processInfo;
         if (!CreateProcessW(
-            realGit,
+            realExecutable,
             commandLine,
             IntPtr.Zero,
             IntPtr.Zero,
@@ -103,15 +104,40 @@ internal static class GitHiddenWrapper
         }
     }
 
-    private static string ResolveRealGit()
+    private static TargetInfo ResolveTarget()
     {
-        var fromEnv = Environment.GetEnvironmentVariable("CODEX_REAL_GIT");
+        var self = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+        if (string.Equals(Path.GetFileName(self), "powershell.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TargetInfo(
+                "PowerShell",
+                "CODEX_REAL_POWERSHELL",
+                "real-powershell.txt",
+                new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe") });
+        }
+
+        return new TargetInfo(
+            "Git",
+            "CODEX_REAL_GIT",
+            "real-git.txt",
+            new[]
+            {
+                @"C:\Program Files\Git\cmd\git.exe",
+                @"C:\Program Files\Git\bin\git.exe",
+                @"C:\Program Files (x86)\Git\cmd\git.exe",
+                @"C:\Program Files (x86)\Git\bin\git.exe"
+            });
+    }
+
+    private static string ResolveRealExecutable(TargetInfo target)
+    {
+        var fromEnv = Environment.GetEnvironmentVariable(target.EnvironmentVariable);
         if (!string.IsNullOrWhiteSpace(fromEnv))
         {
             return fromEnv.Trim();
         }
 
-        var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "real-git.txt");
+        var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, target.ConfigFile);
         if (File.Exists(configPath))
         {
             var configured = File.ReadAllText(configPath).Trim();
@@ -121,13 +147,7 @@ internal static class GitHiddenWrapper
             }
         }
 
-        foreach (var candidate in new[]
-        {
-            @"C:\Program Files\Git\cmd\git.exe",
-            @"C:\Program Files\Git\bin\git.exe",
-            @"C:\Program Files (x86)\Git\cmd\git.exe",
-            @"C:\Program Files (x86)\Git\bin\git.exe"
-        })
+        foreach (var candidate in target.Candidates)
         {
             if (File.Exists(candidate))
             {
@@ -136,6 +156,22 @@ internal static class GitHiddenWrapper
         }
 
         return null;
+    }
+
+    private sealed class TargetInfo
+    {
+        internal TargetInfo(string displayName, string environmentVariable, string configFile, string[] candidates)
+        {
+            DisplayName = displayName;
+            EnvironmentVariable = environmentVariable;
+            ConfigFile = configFile;
+            Candidates = candidates;
+        }
+
+        internal string DisplayName { get; private set; }
+        internal string EnvironmentVariable { get; private set; }
+        internal string ConfigFile { get; private set; }
+        internal string[] Candidates { get; private set; }
     }
 
     private static void SafeError(string message)

@@ -8,6 +8,7 @@
 #include <windows.h>
 #include <shellapi.h>
 
+#include <cwctype>
 #include <string>
 #include <vector>
 
@@ -100,28 +101,64 @@ static std::wstring GetEnvironmentString(const wchar_t* name) {
     return Trim(value);
 }
 
-static std::wstring ResolveRealGit() {
-    std::wstring fromEnv = GetEnvironmentString(L"CODEX_REAL_GIT");
+struct TargetConfig {
+    std::wstring displayName;
+    std::wstring environmentVariable;
+    std::wstring configFile;
+    std::vector<std::wstring> candidates;
+};
+
+static std::wstring GetExeBaseName() {
+    std::vector<wchar_t> buffer(MAX_PATH);
+    DWORD length = GetModuleFileNameW(nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+    if (length == 0) {
+        return L"";
+    }
+    std::wstring path(buffer.data(), length);
+    size_t slash = path.find_last_of(L"\\/");
+    std::wstring name = slash == std::wstring::npos ? path : path.substr(slash + 1);
+    for (wchar_t& ch : name) {
+        ch = static_cast<wchar_t>(towlower(ch));
+    }
+    return name;
+}
+
+static TargetConfig GetTargetConfig() {
+    if (GetExeBaseName() == L"powershell.exe") {
+        wchar_t windowsDirectory[MAX_PATH] = {};
+        GetWindowsDirectoryW(windowsDirectory, MAX_PATH);
+        std::wstring systemPowerShell = std::wstring(windowsDirectory) + L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
+        return {L"PowerShell", L"CODEX_REAL_POWERSHELL", L"real-powershell.txt", {systemPowerShell}};
+    }
+
+    return {
+        L"Git",
+        L"CODEX_REAL_GIT",
+        L"real-git.txt",
+        {
+            L"C:\\Program Files\\Git\\cmd\\git.exe",
+            L"C:\\Program Files\\Git\\bin\\git.exe",
+            L"C:\\Program Files (x86)\\Git\\cmd\\git.exe",
+            L"C:\\Program Files (x86)\\Git\\bin\\git.exe",
+        },
+    };
+}
+
+static std::wstring ResolveRealExecutable(const TargetConfig& target) {
+    std::wstring fromEnv = GetEnvironmentString(target.environmentVariable.c_str());
     if (!fromEnv.empty() && FileExists(fromEnv)) {
         return fromEnv;
     }
 
     std::wstring exeDir = GetExeDirectory();
     if (!exeDir.empty()) {
-        std::wstring configured = ReadTextFile(exeDir + L"\\real-git.txt");
+        std::wstring configured = ReadTextFile(exeDir + L"\\" + target.configFile);
         if (!configured.empty() && FileExists(configured)) {
             return configured;
         }
     }
 
-    const wchar_t* candidates[] = {
-        L"C:\\Program Files\\Git\\cmd\\git.exe",
-        L"C:\\Program Files\\Git\\bin\\git.exe",
-        L"C:\\Program Files (x86)\\Git\\cmd\\git.exe",
-        L"C:\\Program Files (x86)\\Git\\bin\\git.exe",
-    };
-
-    for (const wchar_t* candidate : candidates) {
+    for (const std::wstring& candidate : target.candidates) {
         if (FileExists(candidate)) {
             return candidate;
         }
@@ -175,13 +212,14 @@ static void WriteStderr(const std::wstring& message) {
 }
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
-    std::wstring realGit = ResolveRealGit();
-    if (realGit.empty()) {
-        WriteStderr(L"Real Git executable was not found. Set CODEX_REAL_GIT or reinstall the wrapper.");
+    TargetConfig target = GetTargetConfig();
+    std::wstring realExecutable = ResolveRealExecutable(target);
+    if (realExecutable.empty()) {
+        WriteStderr(L"Real " + target.displayName + L" executable was not found. Reinstall the wrapper.");
         return 1;
     }
 
-    std::wstring fullCommandLine = QuoteArg(realGit);
+    std::wstring fullCommandLine = QuoteArg(realExecutable);
     if (commandLine != nullptr && commandLine[0] != L'\0') {
         fullCommandLine += L" ";
         fullCommandLine += commandLine;
@@ -199,7 +237,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     mutableCommandLine.push_back(L'\0');
 
     BOOL created = CreateProcessW(
-        realGit.c_str(),
+        realExecutable.c_str(),
         mutableCommandLine.data(),
         nullptr,
         nullptr,
@@ -211,7 +249,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         &processInfo);
 
     if (!created) {
-        WriteStderr(L"Failed to start real Git.");
+        WriteStderr(L"Failed to start real " + target.displayName + L".");
         return 1;
     }
 

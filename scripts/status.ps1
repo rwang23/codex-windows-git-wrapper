@@ -3,18 +3,23 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$scriptsDir = Split-Path -Parent $PSCommandPath
+. (Join-Path $scriptsDir "codex-package.ps1")
 
 $wrapper = Join-Path $InstallDir "git.exe"
+$powerShellWrapper = Join-Path $InstallDir "powershell.exe"
 $config = Join-Path $InstallDir "real-git.txt"
+$powerShellConfig = Join-Path $InstallDir "real-powershell.txt"
 $kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
-$package = Get-AppxPackage -Name OpenAI.Codex -ErrorAction SilentlyContinue |
-    Sort-Object Version -Descending |
-    Select-Object -First 1
+$packageInfo = Resolve-CodexDesktopPackage
+$package = $packageInfo.Package
 
 Write-Output "Codex package:"
 if ($package) {
     Write-Output "  Version: $($package.Version)"
     Write-Output "  Location: $($package.InstallLocation)"
+    Write-Output "  Executable: $($packageInfo.ExecutablePath)"
+    Write-Output "  Process: $($packageInfo.ProcessName).exe"
 } else {
     Write-Output "  Not found"
 }
@@ -36,12 +41,37 @@ if (Test-Path -LiteralPath $wrapper) {
 }
 
 Write-Output ""
+Write-Output "PowerShell wrapper:"
+if (Test-Path -LiteralPath $powerShellWrapper) {
+    $item = Get-Item -LiteralPath $powerShellWrapper
+    Write-Output "  Present: yes"
+    Write-Output "  Path: $($item.FullName)"
+} else {
+    Write-Output "  Present: no"
+}
+
+Write-Output ""
 Write-Output "Configured real Git:"
 if (Test-Path -LiteralPath $config) {
     $realGit = (Get-Content -LiteralPath $config -Raw).Trim()
     Write-Output "  Path: $realGit"
     if ($realGit -and (Test-Path -LiteralPath $realGit)) {
         Write-Output "  Version: $(& $realGit --version)"
+    } else {
+        Write-Output "  Missing or invalid"
+    }
+} else {
+    Write-Output "  Not configured"
+}
+
+Write-Output ""
+Write-Output "Configured real PowerShell:"
+if (Test-Path -LiteralPath $powerShellConfig) {
+    $realPowerShell = (Get-Content -LiteralPath $powerShellConfig -Raw).Trim()
+    Write-Output "  Path: $realPowerShell"
+    if ($realPowerShell -and (Test-Path -LiteralPath $realPowerShell)) {
+        $version = & $realPowerShell -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
+        Write-Output "  Version: $version"
     } else {
         Write-Output "  Missing or invalid"
     }
@@ -86,6 +116,13 @@ if ($featureLine) {
 }
 
 Write-Output ""
+Write-Output "Codex process-manager state:"
+$processStateHealth = Get-CodexProcessStateHealth
+Write-Output "  Path: $($processStateHealth.Path)"
+Write-Output "  Exists: $($processStateHealth.Exists)"
+Write-Output "  Health: $($processStateHealth.Reason)"
+
+Write-Output ""
 Write-Output "Standalone CLI sandbox helpers:"
 $helperNames = @("codex-command-runner.exe", "codex-windows-sandbox-setup.exe")
 $npmHelperRoot = $null
@@ -127,11 +164,7 @@ Write-Output "  Machine PATH contains wrapper: $([bool]$machinePathHasWrapper)"
 
 Write-Output ""
 Write-Output "Running Codex processes:"
-$runningCodex = Get-Process -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.ProcessName -in @("Codex", "codex") -and
-        $_.Path -like "*OpenAI*Codex*"
-    } |
+$runningCodex = Get-RunningCodexDesktopProcesses -PackageInfo $packageInfo |
     Select-Object Id, ProcessName, Path
 
 if ($runningCodex) {

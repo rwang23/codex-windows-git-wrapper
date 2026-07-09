@@ -1,5 +1,6 @@
 param(
     [string]$RealGit,
+    [string]$RealPowerShell,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
 )
 
@@ -171,6 +172,39 @@ function Resolve-RealGit {
     throw "Could not detect real Git. Run Get-Command git -All, then pass -RealGit with the full path to your real git.exe."
 }
 
+function Resolve-RealPowerShell {
+    param(
+        [string]$RequestedRealPowerShell,
+        [string]$WrapperInstallDir
+    )
+
+    if ($RequestedRealPowerShell) {
+        if (-not (Test-Path -LiteralPath $RequestedRealPowerShell)) {
+            throw "The provided -RealPowerShell path does not exist: $RequestedRealPowerShell"
+        }
+        return (Resolve-Path -LiteralPath $RequestedRealPowerShell).Path
+    }
+
+    $commands = Get-Command powershell.exe -All -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.CommandType -eq "Application" -and
+            $_.Source -and
+            $_.Source -notlike "$WrapperInstallDir*"
+        } |
+        Select-Object -First 1
+
+    if ($commands) {
+        return $commands.Source
+    }
+
+    $candidate = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
+    if (Test-Path -LiteralPath $candidate) {
+        return $candidate
+    }
+
+    throw "Could not detect Windows PowerShell. Pass -RealPowerShell with the full path to powershell.exe."
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $source = Join-Path $repoRoot "src\GitHiddenWrapper.cs"
 $nativeSource = Join-Path $repoRoot "src\GitHiddenWrapper.cpp"
@@ -179,7 +213,9 @@ if (-not (Test-Path -LiteralPath $source)) {
 }
 
 $resolvedRealGit = Resolve-RealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
+$resolvedRealPowerShell = Resolve-RealPowerShell -RequestedRealPowerShell $RealPowerShell -WrapperInstallDir $InstallDir
 $gitVersion = & $resolvedRealGit --version
+$powerShellVersion = & $resolvedRealPowerShell -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 $output = Join-Path $InstallDir "git.exe"
@@ -202,13 +238,20 @@ if (-not (Test-Path -LiteralPath $output)) {
     throw "Compilation failed. Wrapper was not created at $output"
 }
 
+$powerShellOutput = Join-Path $InstallDir "powershell.exe"
+Copy-Item -LiteralPath $output -Destination $powerShellOutput -Force
+
 Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolvedRealGit -Encoding ASCII
+Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $resolvedRealPowerShell -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
 
 Write-Output "Installed Codex Git wrapper."
 Write-Output "Wrapper:  $output"
+Write-Output "PowerShell wrapper: $powerShellOutput"
 Write-Output "Build:    $buildKind"
 Write-Output "Real Git: $resolvedRealGit"
+Write-Output "Real PowerShell: $resolvedRealPowerShell"
 Write-Output "Version:  $gitVersion"
+Write-Output "PowerShell version: $powerShellVersion"
 Write-Output ""
 Write-Output "Next: close Codex, then run scripts\start-codex-with-git-wrapper.ps1"

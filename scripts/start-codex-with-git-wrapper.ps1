@@ -2,10 +2,13 @@ param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper"),
-    [string]$RealGit
+    [string]$RealGit,
+    [string]$RealPowerShell
 )
 
 $ErrorActionPreference = "Stop"
+$scriptsDir = Split-Path -Parent $PSCommandPath
+. (Join-Path $scriptsDir "codex-package.ps1")
 
 function Resolve-ConfiguredRealGit {
     param(
@@ -31,29 +34,46 @@ function Resolve-ConfiguredRealGit {
     throw "Real Git path is not configured. Run scripts\install.ps1 first, or pass -RealGit."
 }
 
+function Resolve-ConfiguredRealPowerShell {
+    param(
+        [string]$RequestedRealPowerShell,
+        [string]$WrapperInstallDir
+    )
+
+    if ($RequestedRealPowerShell) {
+        if (-not (Test-Path -LiteralPath $RequestedRealPowerShell)) {
+            throw "The provided -RealPowerShell path does not exist: $RequestedRealPowerShell"
+        }
+        return (Resolve-Path -LiteralPath $RequestedRealPowerShell).Path
+    }
+
+    $configPath = Join-Path $WrapperInstallDir "real-powershell.txt"
+    if (Test-Path -LiteralPath $configPath) {
+        $configured = (Get-Content -LiteralPath $configPath -Raw).Trim()
+        if ($configured -and (Test-Path -LiteralPath $configured)) {
+            return $configured
+        }
+    }
+
+    throw "Real PowerShell path is not configured. Run scripts\install.ps1 first, or pass -RealPowerShell."
+}
+
 $wrapper = Join-Path $InstallDir "git.exe"
+$powerShellWrapper = Join-Path $InstallDir "powershell.exe"
 if (-not (Test-Path -LiteralPath $wrapper)) {
     throw "Git wrapper was not found at $wrapper. Run scripts\install.ps1 first."
 }
-
-$realGitPath = Resolve-ConfiguredRealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
-
-$package = Get-AppxPackage -Name OpenAI.Codex -ErrorAction SilentlyContinue |
-    Sort-Object Version -Descending |
-    Select-Object -First 1
-
-if (-not $package) {
-    throw "OpenAI.Codex AppX package was not found."
+if (-not (Test-Path -LiteralPath $powerShellWrapper)) {
+    throw "PowerShell wrapper was not found at $powerShellWrapper. Run scripts\install.ps1 first."
 }
 
-$codexExe = Join-Path $package.InstallLocation "app\Codex.exe"
-$appUserModelId = "$($package.PackageFamilyName)!App"
+$realGitPath = Resolve-ConfiguredRealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
+$realPowerShellPath = Resolve-ConfiguredRealPowerShell -RequestedRealPowerShell $RealPowerShell -WrapperInstallDir $InstallDir
 
-$runningCodex = Get-Process -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.ProcessName -in @("Codex", "codex") -and
-        $_.Path -like "*OpenAI*Codex*"
-    }
+$packageInfo = Resolve-CodexDesktopPackage
+$codexExe = $packageInfo.ExecutablePath
+$appUserModelId = $packageInfo.AppUserModelId
+$runningCodex = Get-RunningCodexDesktopProcesses -PackageInfo $packageInfo
 
 if ($runningCodex -and -not $Force) {
     Write-Warning "Codex is already running. Close Codex completely first, then run this script again."
@@ -67,7 +87,20 @@ if ($runningCodex -and $Force) {
     Start-Sleep -Seconds 2
 }
 
+if ($Force) {
+    try {
+        $processStateBackup = Backup-InvalidCodexProcessState
+        if ($processStateBackup) {
+            Write-Warning "Backed up invalid Codex process-manager state: $processStateBackup"
+        }
+    }
+    catch {
+        Write-Warning "Could not back up invalid Codex process-manager state: $($_.Exception.Message)"
+    }
+}
+
 $env:CODEX_REAL_GIT = $realGitPath
+$env:CODEX_REAL_POWERSHELL = $realPowerShellPath
 $env:Path = "$InstallDir;$env:Path"
 
 if ($DisableShellSnapshot) {
@@ -86,7 +119,9 @@ if ($DisableShellSnapshot) {
 Write-Output "Starting Codex with Git wrapper."
 Write-Output "Codex:   $codexExe"
 Write-Output "Wrapper: $wrapper"
+Write-Output "PowerShell wrapper: $powerShellWrapper"
 Write-Output "RealGit: $realGitPath"
+Write-Output "RealPowerShell: $realPowerShellPath"
 if ($DisableShellSnapshot) {
     Write-Output "Feature: shell_snapshot disabled"
 }

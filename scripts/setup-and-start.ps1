@@ -2,6 +2,7 @@ param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
     [string]$RealGit,
+    [string]$RealPowerShell,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
 )
 
@@ -11,12 +12,15 @@ $scriptsDir = Split-Path -Parent $PSCommandPath
 $installScript = Join-Path $scriptsDir "install.ps1"
 $statusScript = Join-Path $scriptsDir "status.ps1"
 $startScript = Join-Path $scriptsDir "start-codex-with-git-wrapper.ps1"
+$packageScript = Join-Path $scriptsDir "codex-package.ps1"
 
-foreach ($script in @($installScript, $statusScript, $startScript)) {
+foreach ($script in @($installScript, $statusScript, $startScript, $packageScript)) {
     if (-not (Test-Path -LiteralPath $script)) {
         throw "Required script not found: $script"
     }
 }
+
+. $packageScript
 
 $installArgs = @(
     "-ExecutionPolicy", "Bypass",
@@ -26,6 +30,9 @@ $installArgs = @(
 
 if ($RealGit) {
     $installArgs += @("-RealGit", $RealGit)
+}
+if ($RealPowerShell) {
+    $installArgs += @("-RealPowerShell", $RealPowerShell)
 }
 
 Write-Output "Installing or refreshing Codex Git wrapper..."
@@ -44,16 +51,16 @@ $startArgs = @(
 if ($RealGit) {
     $startArgs += @("-RealGit", $RealGit)
 }
+if ($RealPowerShell) {
+    $startArgs += @("-RealPowerShell", $RealPowerShell)
+}
 
 if ($DisableShellSnapshot) {
     $startArgs += "-DisableShellSnapshot"
 }
 
-$runningCodex = Get-Process -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.ProcessName -in @("Codex", "codex") -and
-        $_.Path -like "*OpenAI*Codex*"
-    }
+$packageInfo = Resolve-CodexDesktopPackage
+$runningCodex = Get-RunningCodexDesktopProcesses -PackageInfo $packageInfo
 
 if ($runningCodex -and -not $Force) {
     Write-Warning "Codex is already running. Existing Codex processes keep their old PATH, so the wrapper cannot apply yet."

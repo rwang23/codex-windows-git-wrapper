@@ -1,8 +1,8 @@
 # Codex Windows Git Wrapper
 
-Temporary workaround for Windows Codex App users who see transient `git.exe` console windows flashing while Codex runs tasks.
+Temporary workaround for Windows ChatGPT/Codex App users who see transient `git.exe`, `powershell.exe`, or `conhost.exe` windows flashing while Codex runs tasks.
 
-This project is intentionally small and conservative. It does not patch Codex, replace Git, or change persistent system configuration. It only provides a launcher that starts Codex with a process-local `PATH` entry pointing to a small `git.exe` wrapper.
+This project is intentionally small and conservative. It does not patch Codex, replace Git or PowerShell, or change persistent system configuration. It provides a launcher that starts Codex with a process-local `PATH` entry pointing to small `git.exe` and `powershell.exe` wrappers.
 
 For current Codex Desktop builds, the launcher can also disable the `shell_snapshot` feature. This is a separate Windows issue: Codex's background process polling can start visible PowerShell/conhost windows even when Git itself is wrapped.
 
@@ -21,15 +21,17 @@ The upstream fix should come from Codex launching Git with the appropriate Windo
 
 ## What This Does
 
-The wrapper is a tiny Windows GUI executable named `git.exe`. When Codex invokes `git`, the wrapper starts your real Git executable with `CREATE_NO_WINDOW`, then waits for Git to exit and returns the same exit code.
+The wrapper is a tiny Windows GUI executable installed as both `git.exe` and `powershell.exe`. It selects the real target from its own filename, starts that executable with `CREATE_NO_WINDOW`, waits for it to exit, and returns the same exit code. Arguments and standard streams are forwarded.
 
 When a native C++ compiler is available, the installer builds a native wrapper first. If no native compiler is available, it falls back to the managed C# wrapper.
 
-The wrapper target Git path is supplied by:
+The Git wrapper target is supplied by:
 
 1. `CODEX_REAL_GIT` environment variable set by the launcher.
 2. `real-git.txt` in the wrapper install directory.
 3. Common Git for Windows install paths as a fallback.
+
+The PowerShell wrapper uses `CODEX_REAL_POWERSHELL`, then `real-powershell.txt`, then the built-in Windows PowerShell path under `System32`.
 
 ## What This Does Not Do
 
@@ -38,6 +40,7 @@ The wrapper target Git path is supplied by:
 - It does not modify system or user `PATH`.
 - It does not modify the registry.
 - It does not reduce Codex's Git polling frequency.
+- It hides PowerShell console windows but cannot remove the Desktop app's internal PowerShell/CIM telemetry work. Disabling `shell_snapshot`, clearing only invalid process-manager state, and keeping generated files ignored can reduce amplification; the full CPU fix still belongs upstream.
 
 ## Install
 
@@ -82,9 +85,19 @@ If Codex Desktop is flashing PowerShell/conhost windows, use the optional featur
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps1 -DisableShellSnapshot
 ```
 
+To update the repository and force-restart the current ChatGPT/Codex Desktop app from any directory, use this one-line command (adjust the clone path if needed):
+
+```powershell
+git -C "C:\projects\tools\codex-windows-git-wrapper" pull; powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -DisableShellSnapshot -Force
+```
+
 This writes `shell_snapshot = false` to the Codex user configuration. Restart Codex after running it. It keeps the normal shell tool enabled, but disables the background shell/process snapshot loop.
 
-The launcher resolves the installed MSIX package but does not use `Test-Path` on `WindowsApps\...\Codex.exe`; newer Windows package ACLs can deny that read check even when the app is launchable. It starts the packaged executable directly and only falls back to the registered AppsFolder entry if Windows denies the direct launch.
+The launcher reads the executable and application ID from the installed MSIX manifest. This matters because current packages use `app\ChatGPT.exe`, while older releases used `app\Codex.exe`. The same manifest-derived process name is used for running-process detection and `-Force`, so an existing app is actually stopped before the wrapper environment is applied. Hard-coding `Codex.exe` causes the launcher to miss the renamed process and fall back to AppX activation, which does not reliably inherit the process-local wrapper `PATH`.
+
+The launcher does not use `Test-Path` on the protected `WindowsApps` executable; newer package ACLs can deny that read check even when the app is launchable. It starts the manifest-declared executable directly and only falls back to the registered AppsFolder entry if Windows denies the direct launch.
+
+When `-Force` is used, the launcher also checks `.codex\process_manager\chat_processes.json` after stopping the app. If that file is empty, all-zero, or invalid JSON, it is moved to a timestamped backup before restart. Valid process-manager state is left untouched. This addresses a stale-state condition associated with excessive Windows PowerShell/CIM process sampling without deleting recoverable data.
 
 Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
 
