@@ -1,6 +1,7 @@
 param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
+    [switch]$SuppressProcessSampling,
     [string]$RealGit,
     [string]$RealPowerShell,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
@@ -21,6 +22,21 @@ foreach ($script in @($installScript, $statusScript, $startScript, $packageScrip
 }
 
 . $packageScript
+
+$packageInfo = Resolve-CodexDesktopPackage
+$runningCodex = Get-RunningCodexDesktopProcesses -PackageInfo $packageInfo
+
+if ($runningCodex -and -not $Force) {
+    Write-Warning "Codex is already running. Existing Codex processes keep their old PATH, so the wrapper cannot be safely refreshed."
+    Write-Warning "Close Codex completely, then run this script again, or rerun it with -Force from an external PowerShell window."
+    exit 2
+}
+
+if ($runningCodex -and $Force) {
+    Write-Output "Stopping the running $($packageInfo.ProcessName).exe app before refreshing wrappers..."
+    $runningCodex | Stop-Process -Force
+    Start-Sleep -Seconds 2
+}
 
 $installArgs = @(
     "-ExecutionPolicy", "Bypass",
@@ -58,16 +74,8 @@ if ($RealPowerShell) {
 if ($DisableShellSnapshot) {
     $startArgs += "-DisableShellSnapshot"
 }
-
-$packageInfo = Resolve-CodexDesktopPackage
-$runningCodex = Get-RunningCodexDesktopProcesses -PackageInfo $packageInfo
-
-if ($runningCodex -and -not $Force) {
-    Write-Warning "Codex is already running. Existing Codex processes keep their old PATH, so the wrapper cannot apply yet."
-    Write-Warning "Close Codex completely, then run this script again. Or run the following from an external PowerShell window:"
-    Write-Output ""
-    Write-Output "powershell -NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -Force"
-    exit 2
+if ($SuppressProcessSampling) {
+    $startArgs += "-SuppressProcessSampling"
 }
 
 if ($Force) {

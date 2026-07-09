@@ -88,7 +88,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps
 To update the repository and force-restart the current ChatGPT/Codex Desktop app from any directory, use this one-line command (adjust the clone path if needed):
 
 ```powershell
-git -C "C:\projects\tools\codex-windows-git-wrapper" pull; powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -DisableShellSnapshot -Force
+git -C "C:\projects\tools\codex-windows-git-wrapper" pull; powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\setup-and-start.ps1" -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
 
 This writes `shell_snapshot = false` to the Codex user configuration. Restart Codex after running it. It keeps the normal shell tool enabled, but disables the background shell/process snapshot loop.
@@ -98,6 +98,8 @@ The launcher reads the executable and application ID from the installed MSIX man
 The launcher does not use `Test-Path` on the protected `WindowsApps` executable; newer package ACLs can deny that read check even when the app is launchable. It starts the manifest-declared executable directly and only falls back to the registered AppsFolder entry if Windows denies the direct launch.
 
 When `-Force` is used, the launcher also checks `.codex\process_manager\chat_processes.json` after stopping the app. If that file is empty, all-zero, or invalid JSON, it is moved to a timestamped backup before restart. Valid process-manager state is left untouched. This addresses a stale-state condition associated with excessive Windows PowerShell/CIM process sampling without deleting recoverable data.
+
+`-SuppressProcessSampling` is an opt-in CPU mitigation for the Windows Desktop app's Electron sampler. The PowerShell wrapper recognizes only the two known internal `Get-CimInstance`/`ConvertTo-Json` process-sampling command shapes and returns an empty JSON array without launching real PowerShell. Ordinary PowerShell commands are forwarded normally. Tradeoff: Desktop process CPU/metadata views may be incomplete while this option is enabled. Omit the switch to restore the original sampling behavior.
 
 Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
 

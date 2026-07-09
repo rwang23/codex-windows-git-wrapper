@@ -144,6 +144,33 @@ static TargetConfig GetTargetConfig() {
     };
 }
 
+static bool ShouldSuppressProcessSampling(const TargetConfig& target, const std::wstring& commandLine) {
+    if (target.displayName != L"PowerShell") {
+        return false;
+    }
+
+    std::wstring enabled = GetEnvironmentString(L"CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING");
+    if (enabled != L"1" && enabled != L"true") {
+        return false;
+    }
+
+    bool isProcessQuery = commandLine.find(L"Get-CimInstance Win32_Process") != std::wstring::npos;
+    bool isJsonOutput = commandLine.find(L"ConvertTo-Json") != std::wstring::npos;
+    bool isKnownSampler =
+        commandLine.find(L"Select-Object ProcessId,ParentProcessId") != std::wstring::npos ||
+        commandLine.find(L"Win32_PerfFormattedData_PerfProc_Process") != std::wstring::npos;
+    return isProcessQuery && isJsonOutput && isKnownSampler;
+}
+
+static void WriteStdoutUtf8(const std::string& value) {
+    HANDLE outputHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (outputHandle == INVALID_HANDLE_VALUE || outputHandle == nullptr) {
+        return;
+    }
+    DWORD written = 0;
+    WriteFile(outputHandle, value.data(), static_cast<DWORD>(value.size()), &written, nullptr);
+}
+
 static std::wstring ResolveRealExecutable(const TargetConfig& target) {
     std::wstring fromEnv = GetEnvironmentString(target.environmentVariable.c_str());
     if (!fromEnv.empty() && FileExists(fromEnv)) {
@@ -213,6 +240,12 @@ static void WriteStderr(const std::wstring& message) {
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
     TargetConfig target = GetTargetConfig();
+    std::wstring rawCommandLine = commandLine == nullptr ? L"" : commandLine;
+    if (ShouldSuppressProcessSampling(target, rawCommandLine)) {
+        WriteStdoutUtf8("[]\r\n");
+        return 0;
+    }
+
     std::wstring realExecutable = ResolveRealExecutable(target);
     if (realExecutable.empty()) {
         WriteStderr(L"Real " + target.displayName + L" executable was not found. Reinstall the wrapper.");

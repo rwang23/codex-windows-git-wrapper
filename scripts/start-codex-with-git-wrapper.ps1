@@ -1,6 +1,7 @@
 param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
+    [switch]$SuppressProcessSampling,
     [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper"),
     [string]$RealGit,
     [string]$RealPowerShell
@@ -101,6 +102,11 @@ if ($Force) {
 
 $env:CODEX_REAL_GIT = $realGitPath
 $env:CODEX_REAL_POWERSHELL = $realPowerShellPath
+if ($SuppressProcessSampling) {
+    $env:CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING = "1"
+} else {
+    Remove-Item Env:CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING -ErrorAction SilentlyContinue
+}
 $env:Path = "$InstallDir;$env:Path"
 
 if ($DisableShellSnapshot) {
@@ -124,6 +130,9 @@ Write-Output "RealGit: $realGitPath"
 Write-Output "RealPowerShell: $realPowerShellPath"
 if ($DisableShellSnapshot) {
     Write-Output "Feature: shell_snapshot disabled"
+}
+if ($SuppressProcessSampling) {
+    Write-Output "Feature: Desktop PowerShell process sampling suppressed"
 }
 
 try {

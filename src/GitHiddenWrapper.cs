@@ -41,6 +41,12 @@ internal static class GitHiddenWrapper
     private static int Main(string[] args)
     {
         var target = ResolveTarget();
+        if (ShouldSuppressProcessSampling(target, args))
+        {
+            WriteStandardOutput("[]\r\n");
+            return 0;
+        }
+
         var realExecutable = ResolveRealExecutable(target);
         if (string.IsNullOrWhiteSpace(realExecutable) || !File.Exists(realExecutable))
         {
@@ -156,6 +162,45 @@ internal static class GitHiddenWrapper
         }
 
         return null;
+    }
+
+    private static bool ShouldSuppressProcessSampling(TargetInfo target, string[] args)
+    {
+        if (!string.Equals(target.DisplayName, "PowerShell", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var enabled = Environment.GetEnvironmentVariable("CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING");
+        if (!string.Equals(enabled, "1", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var commandLine = string.Join(" ", args);
+        var isProcessQuery = commandLine.IndexOf("Get-CimInstance Win32_Process", StringComparison.OrdinalIgnoreCase) >= 0;
+        var isJsonOutput = commandLine.IndexOf("ConvertTo-Json", StringComparison.OrdinalIgnoreCase) >= 0;
+        var isKnownSampler =
+            commandLine.IndexOf("Select-Object ProcessId,ParentProcessId", StringComparison.OrdinalIgnoreCase) >= 0 ||
+            commandLine.IndexOf("Win32_PerfFormattedData_PerfProc_Process", StringComparison.OrdinalIgnoreCase) >= 0;
+        return isProcessQuery && isJsonOutput && isKnownSampler;
+    }
+
+    private static void WriteStandardOutput(string value)
+    {
+        try
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            using (var output = Console.OpenStandardOutput())
+            {
+                output.Write(bytes, 0, bytes.Length);
+                output.Flush();
+            }
+        }
+        catch
+        {
+        }
     }
 
     private sealed class TargetInfo

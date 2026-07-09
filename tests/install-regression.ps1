@@ -3,8 +3,8 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $installScript = Join-Path $repoRoot "scripts\install.ps1"
 $testInstall = Join-Path $env:TEMP "codex-wrapper-install-test-$PID"
-$realGit = (Get-Command git.exe -CommandType Application | Select-Object -First 1).Source
-$realPowerShell = (Get-Command powershell.exe -CommandType Application | Select-Object -First 1).Source
+$realGit = (Get-Command git.exe -All -CommandType Application | Where-Object Source -NotLike "*codex-git-wrapper*" | Select-Object -First 1).Source
+$realPowerShell = (Get-Command powershell.exe -All -CommandType Application | Where-Object Source -NotLike "*codex-git-wrapper*" | Select-Object -First 1).Source
 
 function Invoke-Wrapper {
     param([string]$FilePath, [string[]]$ArgumentList)
@@ -41,6 +41,18 @@ try {
     $powerShellResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", "Write-Output 'wrapper-powershell-ok'")
     if ($powerShellResult.ExitCode -ne 0 -or $powerShellResult.Stdout -ne "wrapper-powershell-ok") {
         throw "PowerShell wrapper did not forward correctly: $($powerShellResult.Stdout) $($powerShellResult.Stderr)"
+    }
+
+    $sampleCommand = "`$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Depth 2"
+    $quotedSample = '"' + $sampleCommand.Replace('"', '\"') + '"'
+    $env:CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING = "1"
+    try {
+        $samplingResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", $quotedSample)
+    } finally {
+        Remove-Item Env:CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING -ErrorAction SilentlyContinue
+    }
+    if ($samplingResult.ExitCode -ne 0 -or $samplingResult.Stdout -ne "[]") {
+        throw "Process sampling was not suppressed: $($samplingResult.Stdout) $($samplingResult.Stderr)"
     }
 
     Write-Output "Install regression checks: PASS"
