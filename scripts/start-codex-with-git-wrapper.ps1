@@ -47,9 +47,7 @@ if (-not $package) {
 }
 
 $codexExe = Join-Path $package.InstallLocation "app\Codex.exe"
-if (-not (Test-Path -LiteralPath $codexExe)) {
-    throw "Codex.exe was not found at $codexExe"
-}
+$appUserModelId = "$($package.PackageFamilyName)!App"
 
 $runningCodex = Get-Process -ErrorAction SilentlyContinue |
     Where-Object {
@@ -93,4 +91,15 @@ if ($DisableShellSnapshot) {
     Write-Output "Feature: shell_snapshot disabled"
 }
 
-Start-Process -FilePath $codexExe -WorkingDirectory (Split-Path -Parent $codexExe)
+try {
+    # MSIX files under WindowsApps may deny Test-Path to an external PowerShell
+    # even though Windows can execute the packaged binary. Do not preflight the
+    # protected path; direct launch preserves the process-local wrapper PATH.
+    Start-Process -FilePath $codexExe -ErrorAction Stop
+}
+catch {
+    Write-Warning "Direct MSIX launch was denied: $($_.Exception.Message)"
+    Write-Warning "Falling back to the registered Windows AppX launch entry."
+    Start-Process -FilePath "explorer.exe" -ArgumentList "shell:AppsFolder\$appUserModelId"
+    Write-Warning "The AppX fallback may not inherit the process-local Git wrapper PATH."
+}

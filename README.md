@@ -84,6 +84,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup-and-start.ps
 
 This writes `shell_snapshot = false` to the Codex user configuration. Restart Codex after running it. It keeps the normal shell tool enabled, but disables the background shell/process snapshot loop.
 
+The launcher resolves the installed MSIX package but does not use `Test-Path` on `WindowsApps\...\Codex.exe`; newer Windows package ACLs can deny that read check even when the app is launchable. It starts the packaged executable directly and only falls back to the registered AppsFolder entry if Windows denies the direct launch.
+
 Important: do not run the `-Force` command from inside an active Codex task. It closes existing Codex processes so the newly launched Codex process can inherit the wrapper environment.
 
 If you want a clone-or-update command that works from any directory:
