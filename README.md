@@ -31,6 +31,8 @@ The Git wrapper target is supplied by:
 2. `real-git.txt` in the wrapper install directory.
 3. Common Git for Windows install paths as a fallback.
 
+When Git for Windows provides both `cmd\git.exe` and `mingw64\bin\git.exe`, the installer selects `mingw64\bin\git.exe` deliberately. `cmd\git.exe` is a small dispatcher which starts a second Git process and can create its own `conhost.exe`; bypassing that dispatcher is required for the no-window wrapper to cover the actual Git command.
+
 The PowerShell wrapper uses `CODEX_REAL_POWERSHELL`, then `real-powershell.txt`, then the built-in Windows PowerShell path under `System32`.
 
 ## What This Does Not Do

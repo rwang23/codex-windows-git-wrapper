@@ -126,11 +126,26 @@ function Resolve-RealGit {
         [string]$WrapperInstallDir
     )
 
+    function Prefer-DirectGitExecutable {
+        param([string]$GitPath)
+
+        $resolved = (Resolve-Path -LiteralPath $GitPath).Path
+        if ($resolved -match '[\\/]cmd[\\/]git\.exe$') {
+            $gitRoot = Split-Path -Parent (Split-Path -Parent $resolved)
+            $directGit = Join-Path $gitRoot 'mingw64\bin\git.exe'
+            if (Test-Path -LiteralPath $directGit) {
+                return (Resolve-Path -LiteralPath $directGit).Path
+            }
+        }
+
+        return $resolved
+    }
+
     if ($RequestedRealGit) {
         if (-not (Test-Path -LiteralPath $RequestedRealGit)) {
             throw "The provided -RealGit path does not exist: $RequestedRealGit"
         }
-        return (Resolve-Path -LiteralPath $RequestedRealGit).Path
+        return Prefer-DirectGitExecutable -GitPath $RequestedRealGit
     }
 
     $wrapperPath = Join-Path $WrapperInstallDir "git.exe"
@@ -147,25 +162,28 @@ function Resolve-RealGit {
     $preferred = $commands |
         Sort-Object @{
             Expression = {
-                if ($_.Source -like "*\Git\cmd\git.exe") { 0 }
-                elseif ($_.Source -like "*\Git\bin\git.exe") { 1 }
-                else { 2 }
+                if ($_.Source -like "*\Git\mingw64\bin\git.exe") { 0 }
+                elseif ($_.Source -like "*\Git\cmd\git.exe") { 1 }
+                elseif ($_.Source -like "*\Git\bin\git.exe") { 2 }
+                else { 3 }
             }
         }, Source |
         Select-Object -First 1
 
     if ($preferred) {
-        return $preferred.Source
+        return Prefer-DirectGitExecutable -GitPath $preferred.Source
     }
 
     foreach ($candidate in @(
+        "C:\Program Files\Git\mingw64\bin\git.exe",
         "C:\Program Files\Git\cmd\git.exe",
         "C:\Program Files\Git\bin\git.exe",
+        "C:\Program Files (x86)\Git\mingw64\bin\git.exe",
         "C:\Program Files (x86)\Git\cmd\git.exe",
         "C:\Program Files (x86)\Git\bin\git.exe"
     )) {
         if (Test-Path -LiteralPath $candidate) {
-            return $candidate
+            return Prefer-DirectGitExecutable -GitPath $candidate
         }
     }
 

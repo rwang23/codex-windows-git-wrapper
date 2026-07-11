@@ -136,8 +136,10 @@ static TargetConfig GetTargetConfig() {
         L"CODEX_REAL_GIT",
         L"real-git.txt",
         {
+            L"C:\\Program Files\\Git\\mingw64\\bin\\git.exe",
             L"C:\\Program Files\\Git\\cmd\\git.exe",
             L"C:\\Program Files\\Git\\bin\\git.exe",
+            L"C:\\Program Files (x86)\\Git\\mingw64\\bin\\git.exe",
             L"C:\\Program Files (x86)\\Git\\cmd\\git.exe",
             L"C:\\Program Files (x86)\\Git\\bin\\git.exe",
         },

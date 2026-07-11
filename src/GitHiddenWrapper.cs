@@ -128,8 +128,10 @@ internal static class GitHiddenWrapper
             "real-git.txt",
             new[]
             {
+                @"C:\Program Files\Git\mingw64\bin\git.exe",
                 @"C:\Program Files\Git\cmd\git.exe",
                 @"C:\Program Files\Git\bin\git.exe",
+                @"C:\Program Files (x86)\Git\mingw64\bin\git.exe",
                 @"C:\Program Files (x86)\Git\cmd\git.exe",
                 @"C:\Program Files (x86)\Git\bin\git.exe"
             });

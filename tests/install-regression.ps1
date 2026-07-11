@@ -33,6 +33,18 @@ try {
         throw "PowerShell wrapper was not installed."
     }
 
+    $configuredGit = (Get-Content -LiteralPath (Join-Path $testInstall 'real-git.txt') -Raw).Trim()
+    $expectedGit = $realGit
+    if ($realGit -match '[\\/]cmd[\\/]git\.exe$') {
+        $directGit = Join-Path (Split-Path -Parent (Split-Path -Parent $realGit)) 'mingw64\bin\git.exe'
+        if (Test-Path -LiteralPath $directGit) {
+            $expectedGit = (Resolve-Path -LiteralPath $directGit).Path
+        }
+    }
+    if ($configuredGit -ne $expectedGit) {
+        throw "Installer did not select the direct Git executable. Expected: $expectedGit; Actual: $configuredGit"
+    }
+
     $gitResult = Invoke-Wrapper -FilePath $gitWrapper -ArgumentList @("--version")
     if ($gitResult.ExitCode -ne 0 -or $gitResult.Stdout -notmatch '^git version ') {
         throw "Git wrapper did not forward correctly: $($gitResult.Stdout) $($gitResult.Stderr)"
