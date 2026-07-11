@@ -1,7 +1,7 @@
 param(
     [string]$RealGit,
     [string]$RealPowerShell,
-    [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin")
 )
 
 $ErrorActionPreference = "Stop"

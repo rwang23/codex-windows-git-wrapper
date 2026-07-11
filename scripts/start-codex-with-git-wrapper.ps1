@@ -2,7 +2,7 @@ param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
-    [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper"),
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin"),
     [string]$RealGit,
     [string]$RealPowerShell
 )
@@ -61,10 +61,10 @@ function Resolve-ConfiguredRealPowerShell {
 
 $wrapper = Join-Path $InstallDir "git.exe"
 $powerShellWrapper = Join-Path $InstallDir "powershell.exe"
-if (-not (Test-Path -LiteralPath $wrapper)) {
+if (-not (Test-Path -LiteralPath $wrapper -ErrorAction SilentlyContinue)) {
     throw "Git wrapper was not found at $wrapper. Run scripts\install.ps1 first."
 }
-if (-not (Test-Path -LiteralPath $powerShellWrapper)) {
+if (-not (Test-Path -LiteralPath $powerShellWrapper -ErrorAction SilentlyContinue)) {
     throw "PowerShell wrapper was not found at $powerShellWrapper. Run scripts\install.ps1 first."
 }
 

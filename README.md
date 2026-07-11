@@ -4,6 +4,8 @@ Temporary workaround for Windows ChatGPT/Codex App users who see transient `git.
 
 This project is intentionally small and conservative. It does not patch Codex, replace Git or PowerShell, or change persistent system configuration. It provides a launcher that starts Codex with a process-local `PATH` entry pointing to small `git.exe` and `powershell.exe` wrappers.
 
+By default the wrappers are installed under `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, not under `.codex`. This avoids sandbox ACLs that recent Codex builds can place on files below `.codex`.
+
 For current Codex Desktop builds, the launcher can also disable the `shell_snapshot` feature. This is a separate Windows issue: Codex's background process polling can start visible PowerShell/conhost windows even when Git itself is wrapped.
 
 ## Problem

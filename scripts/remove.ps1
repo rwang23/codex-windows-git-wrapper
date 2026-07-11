@@ -1,5 +1,5 @@
 param(
-    [string]$InstallDir = (Join-Path $env:USERPROFILE ".codex\codex-git-wrapper")
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin")
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,4 +13,3 @@ if (Test-Path -LiteralPath $InstallDir) {
 
 Write-Output "No Git installation files were changed."
 Write-Output "Open Codex normally from the Start menu to run without the wrapper."
-
