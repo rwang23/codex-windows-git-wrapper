@@ -124,11 +124,19 @@ static std::wstring GetExeBaseName() {
 }
 
 static TargetConfig GetTargetConfig() {
-    if (GetExeBaseName() == L"powershell.exe") {
+    std::wstring exeBaseName = GetExeBaseName();
+    if (exeBaseName == L"powershell.exe") {
         wchar_t windowsDirectory[MAX_PATH] = {};
         GetWindowsDirectoryW(windowsDirectory, MAX_PATH);
         std::wstring systemPowerShell = std::wstring(windowsDirectory) + L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
         return {L"PowerShell", L"CODEX_REAL_POWERSHELL", L"real-powershell.txt", {systemPowerShell}};
+    }
+
+    if (exeBaseName == L"cmd.exe") {
+        wchar_t windowsDirectory[MAX_PATH] = {};
+        GetWindowsDirectoryW(windowsDirectory, MAX_PATH);
+        std::wstring systemCmd = std::wstring(windowsDirectory) + L"\\System32\\cmd.exe";
+        return {L"Command Prompt", L"CODEX_REAL_CMD", L"real-cmd.txt", {systemCmd}};
     }
 
     return {

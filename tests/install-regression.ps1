@@ -3,7 +3,14 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $installScript = Join-Path $repoRoot "scripts\install.ps1"
 $testInstall = Join-Path $env:TEMP "codex-wrapper-install-test-$PID"
-$realGit = (Get-Command git.exe -All -CommandType Application | Where-Object Source -NotLike "*codex-git-wrapper*" | Select-Object -First 1).Source
+$realGit = (Get-Command git.exe -All -CommandType Application | Where-Object {
+    $_.Source -notlike "*codex-git-wrapper*" -and
+    $_.Source -notlike "*$([IO.Path]::DirectorySeparatorChar).cache$([IO.Path]::DirectorySeparatorChar)codex-runtimes*" -and
+    $_.Source -notlike "*$([IO.Path]::DirectorySeparatorChar)AppData$([IO.Path]::DirectorySeparatorChar)Local$([IO.Path]::DirectorySeparatorChar)OpenAI$([IO.Path]::DirectorySeparatorChar)Codex*"
+} | Select-Object -First 1).Source
+if (-not $realGit) {
+    throw "No non-Codex Git installation was available for the install regression test."
+}
 $realPowerShell = (Get-Command powershell.exe -All -CommandType Application | Where-Object Source -NotLike "*codex-git-wrapper*" | Select-Object -First 1).Source
 
 function Invoke-Wrapper {
@@ -22,15 +29,19 @@ function Invoke-Wrapper {
 }
 
 try {
-    & $installScript -InstallDir $testInstall -RealGit $realGit -RealPowerShell $realPowerShell
+    & $installScript -InstallDir $testInstall -RealPowerShell $realPowerShell
 
     $gitWrapper = Join-Path $testInstall "git.exe"
     $powerShellWrapper = Join-Path $testInstall "powershell.exe"
+    $cmdWrapper = Join-Path $testInstall "cmd.exe"
     if (-not (Test-Path -LiteralPath $gitWrapper)) {
         throw "Git wrapper was not installed."
     }
     if (-not (Test-Path -LiteralPath $powerShellWrapper)) {
         throw "PowerShell wrapper was not installed."
+    }
+    if (-not (Test-Path -LiteralPath $cmdWrapper)) {
+        throw "Command Prompt wrapper was not installed."
     }
 
     $configuredGit = (Get-Content -LiteralPath (Join-Path $testInstall 'real-git.txt') -Raw).Trim()
@@ -44,6 +55,9 @@ try {
     if ($configuredGit -ne $expectedGit) {
         throw "Installer did not select the direct Git executable. Expected: $expectedGit; Actual: $configuredGit"
     }
+    if ($configuredGit -like "*$([IO.Path]::DirectorySeparatorChar).cache$([IO.Path]::DirectorySeparatorChar)codex-runtimes*") {
+        throw "Installer selected Codex's private runtime Git instead of the user's Git installation: $configuredGit"
+    }
 
     $gitResult = Invoke-Wrapper -FilePath $gitWrapper -ArgumentList @("--version")
     if ($gitResult.ExitCode -ne 0 -or $gitResult.Stdout -notmatch '^git version ') {
@@ -53,6 +67,11 @@ try {
     $powerShellResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", "Write-Output 'wrapper-powershell-ok'")
     if ($powerShellResult.ExitCode -ne 0 -or $powerShellResult.Stdout -ne "wrapper-powershell-ok") {
         throw "PowerShell wrapper did not forward correctly: $($powerShellResult.Stdout) $($powerShellResult.Stderr)"
+    }
+
+    $cmdResult = Invoke-Wrapper -FilePath $cmdWrapper -ArgumentList @("/d", "/s", "/c", "echo wrapper-cmd-ok")
+    if ($cmdResult.ExitCode -ne 0 -or $cmdResult.Stdout -ne "wrapper-cmd-ok") {
+        throw "Command Prompt wrapper did not forward correctly: $($cmdResult.Stdout) $($cmdResult.Stderr)"
     }
 
     $sampleCommand = "`$ErrorActionPreference = 'Stop'; Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId | ConvertTo-Json -Depth 2"

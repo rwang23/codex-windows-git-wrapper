@@ -149,6 +149,8 @@ function Resolve-RealGit {
     }
 
     $wrapperPath = Join-Path $WrapperInstallDir "git.exe"
+    $codexRuntimeRoot = Join-Path $env:USERPROFILE ".cache\codex-runtimes"
+    $codexAppRoot = Join-Path $env:LOCALAPPDATA "OpenAI\Codex"
     $commands = Get-Command git -All -ErrorAction SilentlyContinue |
         Where-Object {
             $_.CommandType -eq "Application" -and
@@ -156,7 +158,9 @@ function Resolve-RealGit {
             $_.Source -notlike "$WrapperInstallDir*" -and
             $_.Source -ne $wrapperPath -and
             $_.Source -notlike "*\codex-git-wrapper\git.exe" -and
-            $_.Source -notlike "*headless-git.exe"
+            $_.Source -notlike "*headless-git.exe" -and
+            $_.Source -notlike "$codexRuntimeRoot*" -and
+            $_.Source -notlike "$codexAppRoot*"
         }
 
     $preferred = $commands |
@@ -232,6 +236,10 @@ if (-not (Test-Path -LiteralPath $source)) {
 
 $resolvedRealGit = Resolve-RealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
 $resolvedRealPowerShell = Resolve-RealPowerShell -RequestedRealPowerShell $RealPowerShell -WrapperInstallDir $InstallDir
+$resolvedRealCmd = Join-Path $env:WINDIR "System32\cmd.exe"
+if (-not (Test-Path -LiteralPath $resolvedRealCmd)) {
+    throw "Could not find the built-in Command Prompt executable: $resolvedRealCmd"
+}
 $gitVersion = & $resolvedRealGit --version
 $powerShellVersion = & $resolvedRealPowerShell -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
 
@@ -258,17 +266,22 @@ if (-not (Test-Path -LiteralPath $output)) {
 
 $powerShellOutput = Join-Path $InstallDir "powershell.exe"
 Copy-Item -LiteralPath $output -Destination $powerShellOutput -Force
+$cmdOutput = Join-Path $InstallDir "cmd.exe"
+Copy-Item -LiteralPath $output -Destination $cmdOutput -Force
 
 Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolvedRealGit -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $resolvedRealPowerShell -Encoding ASCII
+Set-Content -LiteralPath (Join-Path $InstallDir "real-cmd.txt") -Value $resolvedRealCmd -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
 
 Write-Output "Installed Codex Git wrapper."
 Write-Output "Wrapper:  $output"
 Write-Output "PowerShell wrapper: $powerShellOutput"
+Write-Output "Command Prompt wrapper: $cmdOutput"
 Write-Output "Build:    $buildKind"
 Write-Output "Real Git: $resolvedRealGit"
 Write-Output "Real PowerShell: $resolvedRealPowerShell"
+Write-Output "Real Command Prompt: $resolvedRealCmd"
 Write-Output "Version:  $gitVersion"
 Write-Output "PowerShell version: $powerShellVersion"
 Write-Output ""

@@ -8,8 +8,10 @@ $scriptsDir = Split-Path -Parent $PSCommandPath
 
 $wrapper = Join-Path $InstallDir "git.exe"
 $powerShellWrapper = Join-Path $InstallDir "powershell.exe"
+$cmdWrapper = Join-Path $InstallDir "cmd.exe"
 $config = Join-Path $InstallDir "real-git.txt"
 $powerShellConfig = Join-Path $InstallDir "real-powershell.txt"
+$cmdConfig = Join-Path $InstallDir "real-cmd.txt"
 $kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
 $packageInfo = Resolve-CodexDesktopPackage
 $package = $packageInfo.Package
@@ -75,6 +77,25 @@ if (Test-Path -LiteralPath $powerShellConfig) {
     } else {
         Write-Output "  Missing or invalid"
     }
+} else {
+    Write-Output "  Not configured"
+}
+
+Write-Output ""
+Write-Output "Command Prompt wrapper:"
+if (Test-Path -LiteralPath $cmdWrapper) {
+    Write-Output "  Present: yes"
+    Write-Output "  Path: $cmdWrapper"
+} else {
+    Write-Output "  Present: no"
+}
+
+Write-Output ""
+Write-Output "Configured real Command Prompt:"
+if (Test-Path -LiteralPath $cmdConfig) {
+    $realCmd = (Get-Content -LiteralPath $cmdConfig -Raw).Trim()
+    Write-Output "  Path: $realCmd"
+    Write-Output "  Present: $(Test-Path -LiteralPath $realCmd)"
 } else {
     Write-Output "  Not configured"
 }

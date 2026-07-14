@@ -2,7 +2,7 @@
 
 Temporary workaround for Windows ChatGPT/Codex App users who see transient `git.exe`, `powershell.exe`, or `conhost.exe` windows flashing while Codex runs tasks.
 
-This project is intentionally small and conservative. It does not patch Codex, replace Git or PowerShell, or change persistent system configuration. It provides a launcher that starts Codex with a process-local `PATH` entry pointing to small `git.exe` and `powershell.exe` wrappers.
+This project is intentionally small and conservative. It does not patch Codex, replace Git, PowerShell, or Command Prompt, or change persistent system configuration. It provides a launcher that starts Codex with a process-local `PATH` entry pointing to small `git.exe`, `powershell.exe`, and `cmd.exe` wrappers.
 
 By default the wrappers are installed under `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, not under `.codex`. This avoids sandbox ACLs that recent Codex builds can place on files below `.codex`.
 
@@ -23,7 +23,7 @@ The upstream fix should come from Codex launching Git with the appropriate Windo
 
 ## What This Does
 
-The wrapper is a tiny Windows GUI executable installed as both `git.exe` and `powershell.exe`. It selects the real target from its own filename, starts that executable with `CREATE_NO_WINDOW`, waits for it to exit, and returns the same exit code. Arguments and standard streams are forwarded.
+The wrapper is a tiny Windows GUI executable installed as `git.exe`, `powershell.exe`, and `cmd.exe`. It selects the real target from its own filename, starts that executable with `CREATE_NO_WINDOW`, waits for it to exit, and returns the same exit code. Arguments and standard streams are forwarded.
 
 When a native C++ compiler is available, the installer builds a native wrapper first. If no native compiler is available, it falls back to the managed C# wrapper.
 
@@ -33,9 +33,9 @@ The Git wrapper target is supplied by:
 2. `real-git.txt` in the wrapper install directory.
 3. Common Git for Windows install paths as a fallback.
 
-When Git for Windows provides both `cmd\git.exe` and `mingw64\bin\git.exe`, the installer selects `mingw64\bin\git.exe` deliberately. `cmd\git.exe` is a small dispatcher which starts a second Git process and can create its own `conhost.exe`; bypassing that dispatcher is required for the no-window wrapper to cover the actual Git command.
+When Git for Windows provides both `cmd\git.exe` and `mingw64\bin\git.exe`, the installer selects `mingw64\bin\git.exe` deliberately. `cmd\git.exe` is a small dispatcher which starts a second Git process and can create its own `conhost.exe`; bypassing that dispatcher is required for the no-window wrapper to cover the actual Git command. The installer excludes Codex's private cached Git runtime, which can be replaced during a Desktop update.
 
-The PowerShell wrapper uses `CODEX_REAL_POWERSHELL`, then `real-powershell.txt`, then the built-in Windows PowerShell path under `System32`.
+The PowerShell wrapper uses `CODEX_REAL_POWERSHELL`, then `real-powershell.txt`, then the built-in Windows PowerShell path under `System32`. The Command Prompt wrapper uses `CODEX_REAL_CMD`, then `real-cmd.txt`, then `System32\cmd.exe`.
 
 ## What This Does Not Do
 

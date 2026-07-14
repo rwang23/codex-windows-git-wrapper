@@ -113,13 +113,23 @@ internal static class GitHiddenWrapper
     private static TargetInfo ResolveTarget()
     {
         var self = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
-        if (string.Equals(Path.GetFileName(self), "powershell.exe", StringComparison.OrdinalIgnoreCase))
+        var baseName = Path.GetFileName(self);
+        if (string.Equals(baseName, "powershell.exe", StringComparison.OrdinalIgnoreCase))
         {
             return new TargetInfo(
                 "PowerShell",
                 "CODEX_REAL_POWERSHELL",
                 "real-powershell.txt",
                 new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe") });
+        }
+
+        if (string.Equals(baseName, "cmd.exe", StringComparison.OrdinalIgnoreCase))
+        {
+            return new TargetInfo(
+                "Command Prompt",
+                "CODEX_REAL_CMD",
+                "real-cmd.txt",
+                new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\cmd.exe") });
         }
 
         return new TargetInfo(
