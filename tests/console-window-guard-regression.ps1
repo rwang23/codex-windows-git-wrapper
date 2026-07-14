@@ -8,6 +8,7 @@ $guardTestRoot = Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin\guard-tes
 $testRoot = Join-Path $guardTestRoot "codex-console-window-guard-test-$PID"
 $installDir = Join-Path $testRoot "wrapper-bin"
 $fakeChatGpt = Join-Path $testRoot "ChatGPT.exe"
+$fakeCodex = Join-Path $testRoot "Codex.exe"
 $fakeGit = Join-Path $testRoot "Git\cmd\git.exe"
 $activeGuard = Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin\codex-console-window-guard.exe"
 $existingGuards = @(Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue)
@@ -29,6 +30,35 @@ function Find-Csc {
     throw "csc.exe was not available for the console window guard regression test."
 }
 
+function Invoke-GuardFixture {
+    param(
+        [string]$GuardPath,
+        [string]$HostPath,
+        [string]$HostName,
+        [string]$GitPath
+    )
+
+    $guardProcess = Start-Process -FilePath $GuardPath -ArgumentList "--once" -PassThru
+    try {
+        Start-Sleep -Milliseconds 300
+        $hostProcess = Start-Process -FilePath $HostPath -ArgumentList @($GitPath) -PassThru
+        if (-not $guardProcess.WaitForExit(6000)) {
+            throw "The console window guard did not detect the simulated $HostName-to-Git console window."
+        }
+        if ($guardProcess.ExitCode -ne 0) {
+            throw "The console window guard exited with code $($guardProcess.ExitCode)."
+        }
+        $hostProcess.WaitForExit()
+    }
+    finally {
+        if (-not $guardProcess.HasExited) {
+            $guardProcess.Kill()
+            $guardProcess.WaitForExit()
+        }
+        $guardProcess.Dispose()
+    }
+}
+
 try {
     if (-not (Test-Path -LiteralPath $fixtureSource) -or -not (Test-Path -LiteralPath $fakeGitSource)) {
         throw "Guard test fixture is missing."
@@ -46,31 +76,15 @@ try {
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fakeChatGpt)) {
         throw "Could not compile the ChatGPT/Git guard fixture."
     }
+    Copy-Item -LiteralPath $fakeChatGpt -Destination $fakeCodex
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $fakeGit) | Out-Null
     & $csc /nologo /target:winexe /optimize+ /out:$fakeGit $fakeGitSource
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fakeGit)) {
         throw "Could not compile the Git console fixture."
     }
 
-    $guardProcess = Start-Process -FilePath $guard -ArgumentList "--once" -PassThru
-    try {
-        Start-Sleep -Milliseconds 300
-        $hostProcess = Start-Process -FilePath $fakeChatGpt -ArgumentList @($fakeGit) -PassThru
-        if (-not $guardProcess.WaitForExit(6000)) {
-            throw "The console window guard did not detect the simulated ChatGPT-to-Git console window."
-        }
-        if ($guardProcess.ExitCode -ne 0) {
-            throw "The console window guard exited with code $($guardProcess.ExitCode)."
-        }
-        $hostProcess.WaitForExit()
-    }
-    finally {
-        if (-not $guardProcess.HasExited) {
-            $guardProcess.Kill()
-            $guardProcess.WaitForExit()
-        }
-        $guardProcess.Dispose()
-    }
+    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeChatGpt -HostName "ChatGPT" -GitPath $fakeGit
+    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeCodex -HostName "Codex" -GitPath $fakeGit
 
     Write-Output "Console window guard regression checks: PASS"
 }

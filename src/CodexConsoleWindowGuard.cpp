@@ -51,7 +51,7 @@ static bool HasCodexGitAncestry(DWORD processId) {
     CloseHandle(snapshot);
 
     bool hasGit = false;
-    bool hasChatGpt = false;
+    bool hasCodexDesktop = false;
     for (int depth = 0; depth < 64; depth++) {
         const auto iterator = processes.find(processId);
         if (iterator == processes.end()) {
@@ -60,8 +60,10 @@ static bool HasCodexGitAncestry(DWORD processId) {
 
         const std::wstring& executableName = iterator->second.executableName;
         hasGit = hasGit || executableName == L"git.exe";
-        hasChatGpt = hasChatGpt || executableName == L"chatgpt.exe";
-        if (hasGit && hasChatGpt) {
+        hasCodexDesktop = hasCodexDesktop ||
+            executableName == L"chatgpt.exe" ||
+            executableName == L"codex.exe";
+        if (hasGit && hasCodexDesktop) {
             return true;
         }
 
