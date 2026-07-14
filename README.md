@@ -4,7 +4,7 @@ Temporary workaround for Windows ChatGPT/Codex App users who see transient `git.
 
 This project is intentionally small and conservative. Its default mode does not patch Codex, replace Git, PowerShell, or Command Prompt, or change persistent system configuration. It provides a launcher that starts Codex with a process-local `PATH` entry pointing to small `git.exe`, `powershell.exe`, and `cmd.exe` wrappers.
 
-Recent Microsoft Store / MSIX ChatGPT/Codex builds can activate through Windows in a way that bypasses the launcher process's `PATH`, while still starting the system Git for Windows `cmd\git.exe` directly. For that specific case, this repository also provides an **explicit, backup-backed direct Git interposer**. It is opt-in, has a one-command rollback, and never touches `mingw64\bin\git.exe`, system/user `PATH`, or the registry.
+Recent Microsoft Store / MSIX ChatGPT/Codex builds can activate through Windows in a way that bypasses the launcher process's `PATH`, while still starting the system Git for Windows `cmd\git.exe` directly. For that specific case, this repository installs a small **Codex Git console window guard**. It listens only for visible console windows whose ancestry contains both `ChatGPT.exe` and `git.exe`, then immediately hides that window. It never replaces the system Git executable, so normal PowerShell Git commands keep their synchronous behavior.
 
 By default the wrappers are installed under `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, not under `.codex`. This avoids sandbox ACLs that recent Codex builds can place on files below `.codex`.
 
@@ -41,13 +41,15 @@ When Git for Windows provides both `cmd\git.exe` and `mingw64\bin\git.exe`, the 
 
 The PowerShell wrapper uses `CODEX_REAL_POWERSHELL`, then `real-powershell.txt`, then the built-in Windows PowerShell path under `System32`. The Command Prompt wrapper uses `CODEX_REAL_CMD`, then `real-cmd.txt`, then `System32\cmd.exe`.
 
+When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The launcher starts it before Codex. The guard has no window of its own and ignores console windows that are not in a `ChatGPT.exe` → `git.exe` process tree, so ordinary terminal, PowerShell, and Git use are left alone.
+
 ## What This Does Not Do
 
-- The default launcher does not replace your installed Git or modify its directory.
-- The opt-in direct interposer temporarily replaces only Git for Windows `cmd\git.exe`, after hashing and backing up the original executable and any existing adjacent `real-git.txt`. `scripts\remove-system-git-interposer.ps1` restores the exact original executable and configuration.
+- It does not replace your installed Git or modify its directory.
 - It does not modify system or user `PATH`.
 - It does not modify the registry.
 - It does not reduce Codex's Git polling frequency.
+- The console guard targets Git console windows only. It does not suppress a separate PowerShell/CMD window that Codex intentionally opens for an interactive command.
 - It hides PowerShell console windows but cannot remove the Desktop app's internal PowerShell/CIM telemetry work. Disabling `shell_snapshot`, clearing only invalid process-manager state, and keeping generated files ignored can reduce amplification; the full CPU fix still belongs upstream.
 
 ## Install
@@ -81,7 +83,7 @@ Get-Command git -All
 
 ## Normal Launch: No `git pull`
 
-After the wrapper has been installed once, use the existing fast launcher. It does not pull the repository, rebuild the wrapper, or rerun installation:
+After the wrapper has been installed once, use the existing fast launcher. It does not pull the repository, rebuild the wrapper, or rerun installation. It starts the Codex Git console window guard before launching the app:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\start-codex-with-git-wrapper.ps1" -DisableShellSnapshot -SuppressProcessSampling -Force
@@ -111,7 +113,7 @@ git -C "C:\projects\tools\codex-windows-git-wrapper" pull; powershell -NoProfile
 
 This writes `shell_snapshot = false` to the Codex user configuration. Restart Codex after running it. It keeps the normal shell tool enabled, but disables the background shell/process snapshot loop.
 
-The launcher reads the executable and application ID from the installed MSIX manifest. This matters because current packages use `app\ChatGPT.exe`, while older releases used `app\Codex.exe`. The same manifest-derived process name is used for running-process detection and `-Force`, so an existing app is actually stopped before the wrapper environment is applied. Hard-coding `Codex.exe` causes the launcher to miss the renamed process and fall back to AppX activation. Even with the correct executable, some current MSIX builds still bypass the process-local wrapper `PATH`; use the direct interposer below only when live capture confirms that behavior.
+The launcher reads the executable and application ID from the installed MSIX manifest. This matters because current packages use `app\ChatGPT.exe`, while older releases used `app\Codex.exe`. The same manifest-derived process name is used for running-process detection and `-Force`, so an existing app is actually stopped before the wrapper environment is applied. Hard-coding `Codex.exe` causes the launcher to miss the renamed process and fall back to AppX activation. Even with the correct executable, some current MSIX builds still bypass the process-local wrapper `PATH`; the window guard covers their Git console windows without modifying Git itself.
 
 The launcher does not use `Test-Path` on the protected `WindowsApps` executable; newer package ACLs can deny that read check even when the app is launchable. It starts the manifest-declared executable directly and only falls back to the registered AppsFolder entry if Windows denies the direct launch.
 
@@ -144,8 +146,7 @@ Please install this temporary workaround:
 https://github.com/rwang23/codex-windows-git-wrapper
 
 Requirements:
-- Use the standard process-local wrapper first; do not replace or rename my real Git executable by default.
-- Use scripts\install-system-git-interposer.ps1 only if I explicitly authorize a backup-backed direct Git workaround after live process evidence shows the Desktop app bypassing the wrapper PATH.
+- Do not replace, rename, or patch my real Git executable.
 - Do not modify system PATH or user PATH.
 - Clone the repo locally.
 - Run scripts\setup-and-start.ps1 only if I explicitly ask you to restart Codex.
@@ -154,30 +155,22 @@ Requirements:
 - Run scripts\status.ps1 and confirm persistent user/machine PATH do not contain codex-git-wrapper.
 - Do not run scripts\setup-and-start.ps1 -Force or scripts\start-codex-with-git-wrapper.ps1 -Force from inside an active Codex task.
 - Tell me the exact external PowerShell command I should run to start Codex with the wrapper.
-- Tell me the exact standard and direct-interposer rollback commands when applicable.
+- Tell me the exact remove command for rollback.
 ```
 
 The agent should install and verify the workaround, then give you the external PowerShell command to start Codex. It should not run the `-Force` launcher from inside Codex, because that closes Codex and may interrupt the session.
 
-## Direct Git Interposer For Current MSIX Builds
+## Codex Git Console Window Guard
 
-Use this only when status/process capture shows the current ChatGPT/Codex Desktop app launching Git for Windows `...\Git\cmd\git.exe` directly even though the standard launcher was used. It is designed for the Windows behavior where the packaged app does not inherit the launcher's `PATH`.
+The guard is built automatically by `scripts\install.ps1` when a native C++ compiler is available, and the standard launcher starts it before Codex. It receives Windows console-window events and hides only windows with a `ChatGPT.exe` and `git.exe` ancestor chain. This avoids the compatibility problem of replacing `git.exe`: a GUI replacement makes PowerShell treat Git as an asynchronous GUI process.
 
-First ensure the standard wrapper is installed, then install the direct interposer from an external PowerShell:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\install-system-git-interposer.ps1"
-```
-
-The script hashes and backs up the original `cmd\git.exe` under `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin\system-git-interposer-backup`, writes the wrapper's direct `mingw64\bin\git.exe` target before replacement to avoid a race, checks `git --version`, and records state for rollback. If any verification fails, it restores the original dispatcher automatically.
-
-To roll it back exactly:
+Check that it is installed and running:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\remove-system-git-interposer.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "C:\projects\tools\codex-windows-git-wrapper\scripts\status.ps1"
 ```
 
-`scripts\remove.ps1` deliberately refuses to remove the wrapper directory while direct-interposer state is active, so the rollback backup cannot be accidentally discarded.
+If the installer reports that no native C++ compiler is available, the process-local wrappers still work but the guard is unavailable. Install Visual Studio Build Tools/C++ or use the upstream Codex fix when it becomes available.
 
 ## Start Codex With The Wrapper
 
@@ -214,7 +207,7 @@ This reports:
 - Codex App version and install location.
 - Wrapper install path.
 - Configured real Git path.
-- Direct Git interposer state, target, backup, and active check.
+- Codex Git console window guard presence and running state.
 - Current process Git resolution.
 - Whether persistent user or machine `PATH` contains the wrapper.
 - Running Codex processes.
@@ -251,23 +244,16 @@ You can also restore normal behavior by closing Codex and launching it normally 
 
 ## Emergency Recovery
 
-If something goes wrong with the optional direct interposer, close Codex and restore the original Git dispatcher first:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\remove-system-git-interposer.ps1
-```
-
-Then remove the standard wrapper if desired:
+If something goes wrong, close Codex and remove the wrapper and its window guard:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\remove.ps1
 ```
 
-The direct-interposer rollback retains its backup after restoring the original Git dispatcher for audit/recovery.
+No Git installation files need to be restored because this workaround never changes them.
 
 ## Notes
 
-- Do not use the direct interposer unless the standard wrapper has been shown to be bypassed and you have a rollback path.
-- Do not manually copy, rename, or replace `git.exe`; use the paired install/remove scripts so hashes and backups stay consistent.
+- Do not manually copy, rename, or replace `git.exe`.
 - Do not add the wrapper directory to persistent user or machine `PATH`.
 - Remove this workaround after Codex fixes the Windows Git process launch behavior upstream.

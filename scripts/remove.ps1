@@ -4,9 +4,11 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$systemInterposerState = Join-Path $InstallDir "system-git-interposer-state.json"
-if (Test-Path -LiteralPath $systemInterposerState -PathType Leaf) {
-    throw "A direct Git interposer is active. Run scripts\remove-system-git-interposer.ps1 first so the original Git dispatcher is restored before removing $InstallDir."
+$consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
+$runningGuards = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
+    Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } }
+if ($runningGuards) {
+    $runningGuards | Stop-Process -Force
 }
 
 if (Test-Path -LiteralPath $InstallDir) {
@@ -16,5 +18,5 @@ if (Test-Path -LiteralPath $InstallDir) {
     Write-Output "Wrapper directory does not exist: $InstallDir"
 }
 
-Write-Output "No Git installation files were changed by the standard wrapper removal."
+Write-Output "No Git installation files were changed."
 Write-Output "Open Codex normally from the Start menu to run without the wrapper."

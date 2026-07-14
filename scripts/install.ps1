@@ -230,6 +230,7 @@ function Resolve-RealPowerShell {
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $source = Join-Path $repoRoot "src\GitHiddenWrapper.cs"
 $nativeSource = Join-Path $repoRoot "src\GitHiddenWrapper.cpp"
+$consoleWindowGuardSource = Join-Path $repoRoot "src\CodexConsoleWindowGuard.cpp"
 if (-not (Test-Path -LiteralPath $source)) {
     throw "Wrapper source was not found: $source"
 }
@@ -268,6 +269,21 @@ $powerShellOutput = Join-Path $InstallDir "powershell.exe"
 Copy-Item -LiteralPath $output -Destination $powerShellOutput -Force
 $cmdOutput = Join-Path $InstallDir "cmd.exe"
 Copy-Item -LiteralPath $output -Destination $cmdOutput -Force
+$consoleWindowGuardOutput = Join-Path $InstallDir "codex-console-window-guard.exe"
+
+if ($nativeCompiler -and (Test-Path -LiteralPath $consoleWindowGuardSource)) {
+    $existingGuards = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
+        Where-Object { try { $_.Path -eq $consoleWindowGuardOutput } catch { $false } }
+    if ($existingGuards) {
+        $existingGuards | Stop-Process -Force
+    }
+    Build-NativeWrapper -CompilerName $nativeCompiler.Name -CompilerPath $nativeCompiler.Path -EnvScript $nativeCompiler.EnvScript -Source $consoleWindowGuardSource -Output $consoleWindowGuardOutput -BuildDir (Join-Path $repoRoot "obj\console-window-guard")
+    if (-not (Test-Path -LiteralPath $consoleWindowGuardOutput)) {
+        throw "Console window guard compilation failed."
+    }
+} elseif (Test-Path -LiteralPath $consoleWindowGuardOutput) {
+    Write-Warning "Retaining the existing console window guard because no native C++ compiler is currently available to rebuild it."
+}
 
 Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolvedRealGit -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $resolvedRealPowerShell -Encoding ASCII
@@ -278,6 +294,11 @@ Write-Output "Installed Codex Git wrapper."
 Write-Output "Wrapper:  $output"
 Write-Output "PowerShell wrapper: $powerShellOutput"
 Write-Output "Command Prompt wrapper: $cmdOutput"
+if (Test-Path -LiteralPath $consoleWindowGuardOutput) {
+    Write-Output "Console window guard: $consoleWindowGuardOutput"
+} else {
+    Write-Warning "Console window guard was not built because no native C++ compiler was available."
+}
 Write-Output "Build:    $buildKind"
 Write-Output "Real Git: $resolvedRealGit"
 Write-Output "Real PowerShell: $resolvedRealPowerShell"

@@ -59,8 +59,29 @@ function Resolve-ConfiguredRealPowerShell {
     throw "Real PowerShell path is not configured. Run scripts\install.ps1 first, or pass -RealPowerShell."
 }
 
+function Start-ConsoleWindowGuard {
+    param([string]$Path)
+
+    $lastError = $null
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            Start-Process -FilePath $Path -ErrorAction Stop
+            return
+        }
+        catch {
+            $lastError = $_
+            if ($attempt -lt 10) {
+                Start-Sleep -Milliseconds 300
+            }
+        }
+    }
+
+    throw "Could not start the Codex Git console window guard: $($lastError.Exception.Message)"
+}
+
 $wrapper = Join-Path $InstallDir "git.exe"
 $powerShellWrapper = Join-Path $InstallDir "powershell.exe"
+$consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
 if (-not (Test-Path -LiteralPath $wrapper -ErrorAction SilentlyContinue)) {
     throw "Git wrapper was not found at $wrapper. Run scripts\install.ps1 first."
 }
@@ -122,10 +143,25 @@ if ($DisableShellSnapshot) {
     }
 }
 
+if (Test-Path -LiteralPath $consoleWindowGuard -ErrorAction SilentlyContinue) {
+    $runningGuard = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
+        Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } } |
+        Select-Object -First 1
+    if (-not $runningGuard) {
+        Start-ConsoleWindowGuard -Path $consoleWindowGuard
+        Write-Output "Started the Codex Git console window guard."
+    } else {
+        Write-Output "Codex Git console window guard is already running."
+    }
+} else {
+    Write-Warning "Codex Git console window guard is missing. Run scripts\install.ps1 to build it."
+}
+
 Write-Output "Starting Codex with Git wrapper."
 Write-Output "Codex:   $codexExe"
 Write-Output "Wrapper: $wrapper"
 Write-Output "PowerShell wrapper: $powerShellWrapper"
+Write-Output "Console window guard: $consoleWindowGuard"
 Write-Output "RealGit: $realGitPath"
 Write-Output "RealPowerShell: $realPowerShellPath"
 if ($DisableShellSnapshot) {
@@ -139,8 +175,8 @@ try {
     # MSIX files under WindowsApps may deny Test-Path to an external PowerShell
     # even though Windows can execute the packaged binary. Do not preflight the
     # protected path. Current ChatGPT/Codex packages can activate through SIHost
-    # and bypass this process-local PATH; use the optional direct Git interposer
-    # when live process capture confirms direct Git-for-Windows cmd\\git.exe use.
+    # and bypass this process-local PATH; the console window guard above hides
+    # only Git console windows whose ancestry includes ChatGPT.
     Start-Process -FilePath $codexExe -ErrorAction Stop
 }
 catch {

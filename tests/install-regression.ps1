@@ -34,6 +34,7 @@ try {
     $gitWrapper = Join-Path $testInstall "git.exe"
     $powerShellWrapper = Join-Path $testInstall "powershell.exe"
     $cmdWrapper = Join-Path $testInstall "cmd.exe"
+    $consoleWindowGuard = Join-Path $testInstall "codex-console-window-guard.exe"
     if (-not (Test-Path -LiteralPath $gitWrapper)) {
         throw "Git wrapper was not installed."
     }
@@ -42,6 +43,10 @@ try {
     }
     if (-not (Test-Path -LiteralPath $cmdWrapper)) {
         throw "Command Prompt wrapper was not installed."
+    }
+    $buildKind = (Get-Content -LiteralPath (Join-Path $testInstall 'wrapper-kind.txt') -Raw).Trim()
+    if ($buildKind -like 'native-*' -and -not (Test-Path -LiteralPath $consoleWindowGuard)) {
+        throw "Console window guard was not installed with the native wrapper build."
     }
 
     $configuredGit = (Get-Content -LiteralPath (Join-Path $testInstall 'real-git.txt') -Raw).Trim()

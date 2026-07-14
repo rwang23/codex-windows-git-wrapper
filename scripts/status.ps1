@@ -13,7 +13,7 @@ $config = Join-Path $InstallDir "real-git.txt"
 $powerShellConfig = Join-Path $InstallDir "real-powershell.txt"
 $cmdConfig = Join-Path $InstallDir "real-cmd.txt"
 $kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
-$systemInterposerState = Join-Path $InstallDir "system-git-interposer-state.json"
+$consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
 $packageInfo = Resolve-CodexDesktopPackage
 $package = $packageInfo.Package
 
@@ -111,25 +111,16 @@ if ($git) {
 }
 
 Write-Output ""
-Write-Output "Direct system Git interposer:"
-if (Test-Path -LiteralPath $systemInterposerState -PathType Leaf) {
-    try {
-        $interposer = Get-Content -LiteralPath $systemInterposerState -Raw | ConvertFrom-Json
-        $targetExists = Test-Path -LiteralPath $interposer.TargetPath -PathType Leaf
-        $wrapperExists = Test-Path -LiteralPath $interposer.WrapperPath -PathType Leaf
-        $targetHash = if ($targetExists) { (Get-FileHash -LiteralPath $interposer.TargetPath -Algorithm SHA256).Hash } else { $null }
-        $wrapperHash = if ($wrapperExists) { (Get-FileHash -LiteralPath $interposer.WrapperPath -Algorithm SHA256).Hash } else { $null }
-        Write-Output "  State: present"
-        Write-Output "  Dispatcher: $($interposer.TargetPath)"
-        Write-Output "  Real Git: $($interposer.RealGitPath)"
-        Write-Output "  Backup: $(Join-Path $InstallDir 'system-git-interposer-backup\git.exe.original')"
-        Write-Output "  Active: $([bool]($targetHash -and $targetHash -eq $wrapperHash -and $targetHash -eq $interposer.WrapperSha256))"
-    }
-    catch {
-        Write-Output "  State: invalid ($($_.Exception.Message))"
-    }
+Write-Output "Codex Git console window guard:"
+if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
+    $runningGuard = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
+        Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } } |
+        Select-Object -First 1
+    Write-Output "  Present: yes"
+    Write-Output "  Path: $consoleWindowGuard"
+    Write-Output "  Running: $([bool]$runningGuard)"
 } else {
-    Write-Output "  State: not installed"
+    Write-Output "  Present: no"
 }
 
 Write-Output ""
