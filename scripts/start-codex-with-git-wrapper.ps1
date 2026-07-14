@@ -138,7 +138,9 @@ if ($SuppressProcessSampling) {
 try {
     # MSIX files under WindowsApps may deny Test-Path to an external PowerShell
     # even though Windows can execute the packaged binary. Do not preflight the
-    # protected path; direct launch preserves the process-local wrapper PATH.
+    # protected path. Current ChatGPT/Codex packages can activate through SIHost
+    # and bypass this process-local PATH; use the optional direct Git interposer
+    # when live process capture confirms direct Git-for-Windows cmd\\git.exe use.
     Start-Process -FilePath $codexExe -ErrorAction Stop
 }
 catch {
