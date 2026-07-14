@@ -11,6 +11,24 @@ $testDispatcher = Join-Path $testRoot "Git\cmd\git.exe"
 $testConfig = Join-Path (Split-Path -Parent $testDispatcher) "real-git.txt"
 $testBackup = Join-Path $testInstall "system-git-interposer-backup"
 
+function Invoke-Executable {
+    param([string]$FilePath, [string[]]$ArgumentList)
+
+    $stdout = Join-Path $env:TEMP "codex-system-git-interposer-$([System.IO.Path]::GetRandomFileName()).out"
+    $stderr = Join-Path $env:TEMP "codex-system-git-interposer-$([System.IO.Path]::GetRandomFileName()).err"
+    try {
+        $process = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        [pscustomobject]@{
+            ExitCode = $process.ExitCode
+            Stdout = (Get-Content -LiteralPath $stdout -Raw -ErrorAction SilentlyContinue)
+            Stderr = (Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue)
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
 $gitCommands = Get-Command git.exe -All -CommandType Application -ErrorAction Stop |
     Where-Object {
         $_.Source -notlike "*codex-git-wrapper*" -and
@@ -59,9 +77,9 @@ try {
         throw "The interposer did not configure the direct real Git target. Expected: $realGit; Actual: $configuredRealGit"
     }
 
-    $version = & $testDispatcher --version
-    if ($LASTEXITCODE -ne 0 -or $version -notmatch '^git version ') {
-        throw "The interposed dispatcher did not forward --version: $version"
+    $version = Invoke-Executable -FilePath $testDispatcher -ArgumentList @("--version")
+    if ($version.ExitCode -ne 0 -or $version.Stdout -notmatch '^git version ') {
+        throw "The interposed dispatcher did not forward --version: $($version.Stdout) $($version.Stderr)"
     }
 
     $standardRemoveBlocked = $false

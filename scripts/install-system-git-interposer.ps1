@@ -40,6 +40,25 @@ function Copy-FileWithRetry {
     throw "Could not replace $Destination after $Attempts attempts because it remained in use: $($lastError.Exception.Message)"
 }
 
+function Assert-ForwardedGitVersion {
+    param([string]$Path)
+
+    $stdout = Join-Path $env:TEMP "codex-git-interposer-$([System.IO.Path]::GetRandomFileName()).out"
+    $stderr = Join-Path $env:TEMP "codex-git-interposer-$([System.IO.Path]::GetRandomFileName()).err"
+    try {
+        $process = Start-Process -FilePath $Path -ArgumentList "--version" -Wait -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+        $stdoutText = Get-Content -LiteralPath $stdout -Raw -ErrorAction SilentlyContinue
+        $stderrText = Get-Content -LiteralPath $stderr -Raw -ErrorAction SilentlyContinue
+        if ($process.ExitCode -ne 0 -or $stdoutText -notmatch '^git version ') {
+            $details = @($stdoutText, $stderrText) | Where-Object { $_ } | ForEach-Object { $_.Trim() }
+            throw "The interposed Git dispatcher could not run the real Git executable. Exit code: $($process.ExitCode). Output: $($details -join ' | ')"
+        }
+    }
+    finally {
+        Remove-Item -LiteralPath $stdout,$stderr -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Resolve-GitCmdDispatcher {
     param(
         [string]$RequestedPath,
@@ -198,10 +217,7 @@ try {
         throw "The replacement Git dispatcher hash does not match the wrapper."
     }
 
-    $version = & $targetPath --version
-    if ($LASTEXITCODE -ne 0 -or $version -notmatch '^git version ') {
-        throw "The interposed Git dispatcher could not run the real Git executable: $version"
-    }
+    Assert-ForwardedGitVersion -Path $targetPath
 
     $state.RealGitPath = $realGitPath
     $state.WrapperPath = $wrapperPath
