@@ -71,6 +71,23 @@ try {
         exit 0
     }
 
+    $selfTestProcess = Start-Process -FilePath $guard -ArgumentList "--self-test-process-graph" -PassThru
+    try {
+        if (-not $selfTestProcess.WaitForExit(6000)) {
+            throw "The console window guard process-graph self-test timed out."
+        }
+        if ($selfTestProcess.ExitCode -ne 0) {
+            throw "The console window guard process-graph self-test failed with exit code $($selfTestProcess.ExitCode)."
+        }
+    }
+    finally {
+        if (-not $selfTestProcess.HasExited) {
+            $selfTestProcess.Kill()
+            $selfTestProcess.WaitForExit()
+        }
+        $selfTestProcess.Dispose()
+    }
+
     $csc = Find-Csc
     & $csc /nologo /target:winexe /optimize+ /out:$fakeChatGpt $fixtureSource
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $fakeChatGpt)) {

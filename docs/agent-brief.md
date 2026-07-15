@@ -26,7 +26,7 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 - Never replace, rename, patch, or manually copy the user's real `git.exe`.
 - Never persist the wrapper directory in system/user `PATH` or modify the registry.
 - Keep wrappers process-local to Codex launches.
-- Keep the guard narrowly scoped: only visible `ConsoleWindowClass` windows with Git plus ChatGPT/Codex ancestry may be hidden.
+- Keep the guard narrowly scoped: only visible `ConsoleWindowClass` windows with ChatGPT/Codex ancestry plus a targeted `git.exe`, `cmd.exe`, `powershell.exe`, or `pwsh.exe` launcher may be hidden.
 - Preserve normal PowerShell Git behavior. Do not turn the system Git executable into a GUI executable.
 - `-Force` stops Codex. Never run it from an active Codex task; give the user an external PowerShell command instead.
 
@@ -82,5 +82,5 @@ This project has no production service or customer data. Before a public GitHub 
 ## Known Pitfalls
 
 - MSIX files under `WindowsApps` can deny a normal `Test-Path` check even when the app can launch; use the manifest-derived package information.
-- Some MSIX activation paths bypass process-local `PATH`. The console guard is the fallback for Git console windows, not a global console suppressor.
+- Some MSIX activation paths bypass process-local `PATH`. The console guard is the fallback for targeted Git and shell console windows, not a global console suppressor.
 - `-DisableShellSnapshot` and `-SuppressProcessSampling` target separate PowerShell/process-telemetry symptoms and have documented trade-offs.

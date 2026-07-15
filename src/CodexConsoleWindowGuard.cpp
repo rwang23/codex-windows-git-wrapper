@@ -31,7 +31,46 @@ static std::wstring ToLower(const std::wstring& value) {
     return result;
 }
 
-static bool HasCodexGitAncestry(DWORD processId) {
+static bool IsCodexDesktopExecutable(const std::wstring& executableName) {
+    return executableName == L"chatgpt.exe" || executableName == L"codex.exe";
+}
+
+static bool IsConsoleLauncherExecutable(const std::wstring& executableName) {
+    return executableName == L"git.exe" ||
+        executableName == L"cmd.exe" ||
+        executableName == L"powershell.exe" ||
+        executableName == L"pwsh.exe";
+}
+
+static bool HasCodexConsoleLauncherAncestry(
+    const std::unordered_map<DWORD, ProcessInfo>& processes,
+    DWORD processId) {
+    bool hasConsoleLauncher = false;
+    bool hasCodexDesktop = false;
+    for (int depth = 0; depth < 64; depth++) {
+        const auto iterator = processes.find(processId);
+        if (iterator == processes.end()) {
+            break;
+        }
+
+        const std::wstring& executableName = iterator->second.executableName;
+        hasConsoleLauncher = hasConsoleLauncher || IsConsoleLauncherExecutable(executableName);
+        hasCodexDesktop = hasCodexDesktop || IsCodexDesktopExecutable(executableName);
+        if (hasConsoleLauncher && hasCodexDesktop) {
+            return true;
+        }
+
+        DWORD parentProcessId = iterator->second.parentProcessId;
+        if (parentProcessId == 0 || parentProcessId == processId) {
+            break;
+        }
+        processId = parentProcessId;
+    }
+
+    return false;
+}
+
+static bool HasCodexConsoleLauncherAncestry(DWORD processId) {
     HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (snapshot == INVALID_HANDLE_VALUE) {
         return false;
@@ -50,31 +89,7 @@ static bool HasCodexGitAncestry(DWORD processId) {
     }
     CloseHandle(snapshot);
 
-    bool hasGit = false;
-    bool hasCodexDesktop = false;
-    for (int depth = 0; depth < 64; depth++) {
-        const auto iterator = processes.find(processId);
-        if (iterator == processes.end()) {
-            break;
-        }
-
-        const std::wstring& executableName = iterator->second.executableName;
-        hasGit = hasGit || executableName == L"git.exe";
-        hasCodexDesktop = hasCodexDesktop ||
-            executableName == L"chatgpt.exe" ||
-            executableName == L"codex.exe";
-        if (hasGit && hasCodexDesktop) {
-            return true;
-        }
-
-        DWORD parentProcessId = iterator->second.parentProcessId;
-        if (parentProcessId == 0 || parentProcessId == processId) {
-            break;
-        }
-        processId = parentProcessId;
-    }
-
-    return false;
+    return HasCodexConsoleLauncherAncestry(processes, processId);
 }
 
 static void CALLBACK OnWindowEvent(
@@ -100,7 +115,7 @@ static void CALLBACK OnWindowEvent(
 
     DWORD processId = 0;
     GetWindowThreadProcessId(window, &processId);
-    if (processId == 0 || !HasCodexGitAncestry(processId)) {
+    if (processId == 0 || !HasCodexConsoleLauncherAncestry(processId)) {
         return;
     }
 
@@ -110,7 +125,11 @@ static void CALLBACK OnWindowEvent(
     }
 }
 
-static bool HasOnceArgument() {
+static bool HasArgument(const wchar_t* expectedArgument) {
+    if (expectedArgument == nullptr) {
+        return false;
+    }
+
     int argumentCount = 0;
     LPWSTR* arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
     if (arguments == nullptr) {
@@ -119,7 +138,7 @@ static bool HasOnceArgument() {
 
     bool result = false;
     for (int index = 1; index < argumentCount; index++) {
-        if (_wcsicmp(arguments[index], L"--once") == 0) {
+        if (_wcsicmp(arguments[index], expectedArgument) == 0) {
             result = true;
             break;
         }
@@ -128,8 +147,69 @@ static bool HasOnceArgument() {
     return result;
 }
 
+static bool RunProcessGraphSelfTest() {
+    {
+        std::unordered_map<DWORD, ProcessInfo> processes = {
+            {100, {0, L"chatgpt.exe"}},
+            {101, {100, L"cmd.exe"}},
+            {102, {101, L"conhost.exe"}},
+        };
+        if (!HasCodexConsoleLauncherAncestry(processes, 102)) {
+            return false;
+        }
+    }
+
+    {
+        std::unordered_map<DWORD, ProcessInfo> processes = {
+            {200, {0, L"codex.exe"}},
+            {201, {200, L"powershell.exe"}},
+            {202, {201, L"conhost.exe"}},
+        };
+        if (!HasCodexConsoleLauncherAncestry(processes, 202)) {
+            return false;
+        }
+    }
+
+    {
+        std::unordered_map<DWORD, ProcessInfo> processes = {
+            {300, {0, L"chatgpt.exe"}},
+            {301, {300, L"git.exe"}},
+            {302, {301, L"conhost.exe"}},
+        };
+        if (!HasCodexConsoleLauncherAncestry(processes, 302)) {
+            return false;
+        }
+    }
+
+    {
+        std::unordered_map<DWORD, ProcessInfo> processes = {
+            {400, {0, L"chatgpt.exe"}},
+            {401, {400, L"conhost.exe"}},
+        };
+        if (HasCodexConsoleLauncherAncestry(processes, 401)) {
+            return false;
+        }
+    }
+
+    {
+        std::unordered_map<DWORD, ProcessInfo> processes = {
+            {500, {0, L"cmd.exe"}},
+            {501, {500, L"conhost.exe"}},
+        };
+        if (HasCodexConsoleLauncherAncestry(processes, 501)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
-    g_exitAfterFirstMatch = HasOnceArgument();
+    if (HasArgument(L"--self-test-process-graph")) {
+        return RunProcessGraphSelfTest() ? 0 : 1;
+    }
+
+    g_exitAfterFirstMatch = HasArgument(L"--once");
     HWINEVENTHOOK hook = SetWinEventHook(
         EVENT_OBJECT_CREATE,
         EVENT_OBJECT_SHOW,

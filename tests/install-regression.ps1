@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $installScript = Join-Path $repoRoot "scripts\install.ps1"
-$testInstall = Join-Path $env:TEMP "codex-wrapper-install-test-$PID"
+$guardTestRoot = Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin\guard-tests"
+$testInstall = Join-Path $guardTestRoot "codex-wrapper-install-test-$PID"
 $realGit = (Get-Command git.exe -All -CommandType Application | Where-Object {
     $_.Source -notlike "*codex-git-wrapper*" -and
     $_.Source -notlike "*$([IO.Path]::DirectorySeparatorChar).cache$([IO.Path]::DirectorySeparatorChar)codex-runtimes*" -and
@@ -94,5 +95,8 @@ try {
     Write-Output "Install regression checks: PASS"
 }
 finally {
+    if ($testInstall -notlike "$(Join-Path $guardTestRoot 'codex-wrapper-install-test-*')") {
+        throw "Refusing to remove an unexpected test path: $testInstall"
+    }
     Remove-Item -LiteralPath $testInstall -Recurse -Force -ErrorAction SilentlyContinue
 }
