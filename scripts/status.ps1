@@ -14,6 +14,7 @@ $powerShellConfig = Join-Path $InstallDir "real-powershell.txt"
 $cmdConfig = Join-Path $InstallDir "real-cmd.txt"
 $kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
 $consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
+$consoleWindowGuardLog = Join-Path $InstallDir "codex-console-window-guard.log"
 $packageInfo = Resolve-CodexDesktopPackage
 $package = $packageInfo.Package
 
@@ -121,6 +122,20 @@ if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
     Write-Output "  Running: $([bool]$runningGuard)"
 } else {
     Write-Output "  Present: no"
+}
+
+Write-Output ""
+Write-Output "Codex console window guard log:"
+Write-Output "  Path: $consoleWindowGuardLog"
+if (Test-Path -LiteralPath $consoleWindowGuardLog -PathType Leaf) {
+    $logItem = Get-Item -LiteralPath $consoleWindowGuardLog
+    Write-Output "  Exists: yes"
+    Write-Output "  LastWriteTime: $($logItem.LastWriteTime)"
+    Write-Output "  Recent matches:"
+    Get-Content -LiteralPath $consoleWindowGuardLog -Tail 5 |
+        ForEach-Object { Write-Output "    $_" }
+} else {
+    Write-Output "  Exists: no"
 }
 
 Write-Output ""

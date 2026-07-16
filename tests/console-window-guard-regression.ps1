@@ -10,7 +10,9 @@ $installDir = Join-Path $testRoot "wrapper-bin"
 $fakeChatGpt = Join-Path $testRoot "ChatGPT.exe"
 $fakeCodex = Join-Path $testRoot "Codex.exe"
 $fakeGit = Join-Path $testRoot "Git\cmd\git.exe"
+$guardLog = Join-Path $testRoot "codex-console-window-guard.log"
 $activeGuard = Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin\codex-console-window-guard.exe"
+$activeGuardLog = Join-Path (Split-Path -Parent $activeGuard) "codex-console-window-guard.log"
 $existingGuards = @(Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue)
 $restartExistingGuard = $existingGuards.Count -gt 0
 if ($restartExistingGuard) {
@@ -35,10 +37,18 @@ function Invoke-GuardFixture {
         [string]$GuardPath,
         [string]$HostPath,
         [string]$HostName,
-        [string]$GitPath
+        [string]$GitPath,
+        [string]$LogPath
     )
 
-    $guardProcess = Start-Process -FilePath $GuardPath -ArgumentList "--once" -PassThru
+    $previousLogPath = [Environment]::GetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", "Process")
+    [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $LogPath, "Process")
+    try {
+        $guardProcess = Start-Process -FilePath $GuardPath -ArgumentList "--once" -PassThru
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $previousLogPath, "Process")
+    }
     try {
         Start-Sleep -Milliseconds 300
         $hostProcess = Start-Process -FilePath $HostPath -ArgumentList @($GitPath) -PassThru
@@ -100,8 +110,16 @@ try {
         throw "Could not compile the Git console fixture."
     }
 
-    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeChatGpt -HostName "ChatGPT" -GitPath $fakeGit
-    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeCodex -HostName "Codex" -GitPath $fakeGit
+    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeChatGpt -HostName "ChatGPT" -GitPath $fakeGit -LogPath $guardLog
+    Invoke-GuardFixture -GuardPath $guard -HostPath $fakeCodex -HostName "Codex" -GitPath $fakeGit -LogPath $guardLog
+
+    if (-not (Test-Path -LiteralPath $guardLog -PathType Leaf)) {
+        throw "The console window guard did not create its diagnostic log."
+    }
+    $guardLogMatches = @(Select-String -LiteralPath $guardLog -Pattern 'rule=codex-shell')
+    if ($guardLogMatches.Count -lt 2) {
+        throw "The console window guard log did not record both shell-window fixtures."
+    }
 
     Write-Output "Console window guard regression checks: PASS"
 }
@@ -111,6 +129,13 @@ finally {
     }
     Remove-Item -LiteralPath $testRoot -Recurse -Force -ErrorAction SilentlyContinue
     if ($restartExistingGuard -and (Test-Path -LiteralPath $activeGuard)) {
-        Start-Process -FilePath $activeGuard -ErrorAction SilentlyContinue
+        $previousLogPath = [Environment]::GetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", "Process")
+        [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $activeGuardLog, "Process")
+        try {
+            Start-Process -FilePath $activeGuard -ErrorAction SilentlyContinue
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $previousLogPath, "Process")
+        }
     }
 }

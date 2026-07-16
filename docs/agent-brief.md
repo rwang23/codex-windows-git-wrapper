@@ -2,7 +2,7 @@
 
 ## Project Snapshot
 
-- Last reviewed: 2026-07-14
+- Last reviewed: 2026-07-16
 - Purpose: reversible Windows workaround for visible Codex Desktop Git/console windows.
 - Project root: repository root; use relative paths and do not require a particular clone location.
 - Users: Windows users of ChatGPT Codex Desktop who see Git, PowerShell, CMD, or conhost flashes.
@@ -26,7 +26,9 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 - Never replace, rename, patch, or manually copy the user's real `git.exe`.
 - Never persist the wrapper directory in system/user `PATH` or modify the registry.
 - Keep wrappers process-local to Codex launches.
-- Keep the guard narrowly scoped: only visible `ConsoleWindowClass` windows with ChatGPT/Codex ancestry plus a targeted `git.exe`, `cmd.exe`, `powershell.exe`, or `pwsh.exe` launcher may be hidden.
+- Keep the guard narrowly scoped to an exact window owner/process graph: targeted shell owners under ChatGPT/Codex, packaged Codex backend/helper owners under `ChatGPT.exe`, or a Chrome-parented `cmd.exe` native-host bridge. Never hide arbitrary descendants or all windows of a generic class.
+- Preserve the bounded, command-line-free guard log and its 1 MiB truncation limit.
+- Preserve the sparse startup/30-second rescan schedule and its visible-candidate gate; do not turn the guard into another high-frequency process poller.
 - Preserve normal PowerShell Git behavior. Do not turn the system Git executable into a GUI executable.
 - `-Force` stops Codex. Never run it from an active Codex task; give the user an external PowerShell command instead.
 
@@ -56,7 +58,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\console-window-guard
 ## Verification Rules
 
 - Code/launcher behavior: focused regression test on Windows.
-- Guard filter: simulate both process names and verify the `--once` guard exits after the expected console event.
+- Guard filter: simulate both desktop process names, verify `--once` exits after the expected console event, run the process-graph self-test, and verify the matched-window log.
 - Documentation: no machine-specific clone paths, no secrets, and no undocumented safety trade-offs.
 - Release: run the three regression checks, `git diff --check`, and `workflow-lint.ps1` before push.
 
@@ -82,5 +84,6 @@ This project has no production service or customer data. Before a public GitHub 
 ## Known Pitfalls
 
 - MSIX files under `WindowsApps` can deny a normal `Test-Path` check even when the app can launch; use the manifest-derived package information.
-- Some MSIX activation paths bypass process-local `PATH`. The console guard is the fallback for targeted Git and shell console windows, not a global console suppressor.
+- Some MSIX activation paths bypass process-local `PATH`. The console guard is the fallback for targeted shell/backend/native-host windows, not a global console suppressor.
+- Current Codex builds can retain duplicate MCP process pools. The guard may hide their launcher windows, but it must not claim to deduplicate or reap those processes.
 - `-DisableShellSnapshot` and `-SuppressProcessSampling` target separate PowerShell/process-telemetry symptoms and have documented trade-offs.

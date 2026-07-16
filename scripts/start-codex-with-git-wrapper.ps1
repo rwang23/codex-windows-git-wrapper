@@ -60,20 +60,30 @@ function Resolve-ConfiguredRealPowerShell {
 }
 
 function Start-ConsoleWindowGuard {
-    param([string]$Path)
+    param(
+        [string]$Path,
+        [string]$LogPath
+    )
 
     $lastError = $null
-    for ($attempt = 1; $attempt -le 10; $attempt++) {
-        try {
-            Start-Process -FilePath $Path -ErrorAction Stop
-            return
-        }
-        catch {
-            $lastError = $_
-            if ($attempt -lt 10) {
-                Start-Sleep -Milliseconds 300
+    $previousLogPath = [Environment]::GetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", "Process")
+    try {
+        [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $LogPath, "Process")
+        for ($attempt = 1; $attempt -le 10; $attempt++) {
+            try {
+                Start-Process -FilePath $Path -ErrorAction Stop
+                return
+            }
+            catch {
+                $lastError = $_
+                if ($attempt -lt 10) {
+                    Start-Sleep -Milliseconds 300
+                }
             }
         }
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable("CODEX_CONSOLE_GUARD_LOG", $previousLogPath, "Process")
     }
 
     throw "Could not start the Codex Git console window guard: $($lastError.Exception.Message)"
@@ -82,6 +92,7 @@ function Start-ConsoleWindowGuard {
 $wrapper = Join-Path $InstallDir "git.exe"
 $powerShellWrapper = Join-Path $InstallDir "powershell.exe"
 $consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
+$consoleWindowGuardLog = Join-Path $InstallDir "codex-console-window-guard.log"
 if (-not (Test-Path -LiteralPath $wrapper -ErrorAction SilentlyContinue)) {
     throw "Git wrapper was not found at $wrapper. Run scripts\install.ps1 first."
 }
@@ -148,7 +159,7 @@ if (Test-Path -LiteralPath $consoleWindowGuard -ErrorAction SilentlyContinue) {
         Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } } |
         Select-Object -First 1
     if (-not $runningGuard) {
-        Start-ConsoleWindowGuard -Path $consoleWindowGuard
+        Start-ConsoleWindowGuard -Path $consoleWindowGuard -LogPath $consoleWindowGuardLog
         Write-Output "Started the Codex Git console window guard."
     } else {
         Write-Output "Codex Git console window guard is already running."
@@ -162,6 +173,7 @@ Write-Output "Codex:   $codexExe"
 Write-Output "Wrapper: $wrapper"
 Write-Output "PowerShell wrapper: $powerShellWrapper"
 Write-Output "Console window guard: $consoleWindowGuard"
+Write-Output "Console guard log: $consoleWindowGuardLog"
 Write-Output "RealGit: $realGitPath"
 Write-Output "RealPowerShell: $realPowerShellPath"
 if ($DisableShellSnapshot) {

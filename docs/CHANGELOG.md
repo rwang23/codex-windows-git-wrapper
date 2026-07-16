@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here. Earlier history remains available in Git.
 
+## [2026-07-16]
+
+### Changed
+
+- Expanded the guard beyond `ConsoleWindowClass` so it can suppress the persistent blank-window variant owned by the packaged Codex backend or its known console helpers.
+- Added coverage for the Chrome-parented `cmd.exe` native-messaging bridge used by the bundled Codex Chrome plugin.
+- Added a sparse startup/30-second existing-window scan to recover from process-ancestry timing races without introducing continuous process-table polling.
+- Gated each existing-window scan on a visible candidate owner before reading the process graph, reducing idle CPU cost during upstream process storms.
+
+### Added
+
+- A bounded diagnostic log containing only matched PID, executable, window class, and rule information.
+- Status output and regression coverage for the diagnostic log and the new process-graph rules.
+
 ## [2026-07-15]
 
 ### Changed

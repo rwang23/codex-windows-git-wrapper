@@ -14,7 +14,10 @@ Related upstream discussion:
 
 - [Git root metadata probes / high Git startup activity](https://github.com/openai/codex/issues/29110)
 - [PowerShell and conhost flashing on Windows](https://github.com/openai/codex/issues/26613)
+- [Long-lived PowerShell parser / blank-window variant](https://github.com/openai/codex/issues/18984)
 - [Git/conhost orphan behavior](https://github.com/openai/codex/issues/17229)
+- [Duplicate MCP/app child processes](https://github.com/openai/codex/issues/32997)
+- [Current Windows Git process storm](https://github.com/openai/codex/issues/33450)
 
 ## Compatibility and safety boundaries
 
@@ -30,8 +33,8 @@ This project deliberately does **not**:
 
 - Replace, rename, patch, or otherwise modify your installed Git executable.
 - Modify the system or user `PATH`, registry, or package installation.
-- Hide arbitrary console windows. The guard acts only on `ConsoleWindowClass` windows whose process ancestry contains both `ChatGPT.exe` or `Codex.exe` and one targeted console launcher: `git.exe`, `cmd.exe`, `powershell.exe`, or `pwsh.exe`. It leaves consoles outside that Codex process tree, and Codex's own non-shell console, untouched.
-- Reduce Codex's underlying Git polling frequency or fix every possible CPU/crash issue.
+- Hide arbitrary application windows. The guard evaluates the exact window-owning process graph. It covers targeted Git/CMD/PowerShell processes beneath ChatGPT/Codex, the packaged `codex.exe` backend and known console helpers beneath `ChatGPT.exe`, and the Chrome-parented `cmd.exe` bridge used by the bundled Chrome native host. It does not hide unrelated terminals or arbitrary GUI descendants.
+- Reduce Codex's underlying Git polling frequency, deduplicate MCP process pools, or fix every possible CPU/crash issue.
 
 The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outside `.codex`, because recent Codex builds can apply restrictive ACLs below `.codex`.
 
@@ -39,8 +42,9 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 
 1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory. They forward arguments, standard streams, and exit codes to the real executables without creating a console window.
 2. `scripts\start-codex-with-git-wrapper.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
-3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it hides only a Git, Command Prompt, or PowerShell console window in a targeted ChatGPT/Codex process tree.
+3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it observes new top-level windows and uses a sparse startup/30-second rescan so process-ancestry races and persistent blank helper windows are not missed. A rescan reads the process graph only after it finds a visible candidate window, avoiding idle process-table polling.
 4. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
+5. The guard records each window it actually hides in `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin\codex-console-window-guard.log`. The log contains only a timestamp, PID, executable name, window class, and matching rule; it does not record command lines or window text.
 
 The guard is intentionally an observation-and-hide fallback. It never turns the real Git executable into a GUI executable, because that would make ordinary PowerShell Git commands behave asynchronously.
 
@@ -127,7 +131,7 @@ Status:
 $repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $repo "scripts\status.ps1")
 ```
 
-The status report includes the detected app package, wrapper install path, real Git path, console-guard presence/running state, current Git resolution, persistent `PATH` checks, and running Codex processes.
+The status report includes the detected app package, wrapper install path, real Git path, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
 
 Rollback is simple. Close Codex, then run:
 
@@ -149,7 +153,13 @@ Newer MSIX packages can deny ordinary file-read checks under `WindowsApps` even 
 
 ### Git, Command Prompt, or PowerShell windows still appear
 
-Run `status.ps1` first. Check whether the guard is present and running, whether the installed app package is detected, and whether the symptom belongs to a Codex-launched Git, Command Prompt, or PowerShell process. The guard intentionally does not hide consoles outside the Codex process tree, or Codex's own non-shell console.
+Run `status.ps1` first. Check whether the guard is present and running, whether the installed app package is detected, and whether the recent log contains one of these rules:
+
+- `codex-shell`: Git, CMD, PowerShell, or pwsh beneath ChatGPT/Codex.
+- `codex-backend`: the packaged Codex backend or a known console helper beneath `ChatGPT.exe`.
+- `chrome-native-host`: the `cmd.exe` bridge launched by Chrome for the bundled Codex Chrome native host.
+
+No matching log entry means the remaining window has a different owner/process graph and should be captured before broadening the guard again. Do not work around that by globally hiding `cmd.exe`, PowerShell, Windows Terminal, or all console windows.
 
 If the issue started after a Codex desktop update, capture the app package version and `status.ps1` output (with any private paths removed) and open or update an upstream issue. The project will keep tracking Windows package behavior, but it cannot replace a native upstream process-launch fix.
 
@@ -190,7 +200,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\launcher-regression.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\console-window-guard-regression.ps1
 ```
 
-The console-guard test simulates both `ChatGPT.exe` and legacy `Codex.exe` launching a Git console process, and asserts the process-graph rules for `cmd.exe` and PowerShell ancestry. It skips only when no native compiler is available.
+The console-guard test simulates both `ChatGPT.exe` and legacy `Codex.exe` launching a Git console process, verifies diagnostic logging, and asserts process-graph rules for shell launchers, the packaged Codex backend, and the Chrome native-host bridge. It skips only when no native compiler is available.
 
 Please report the desktop package version, the exact visible process/window symptom, and the redacted `status.ps1` output. Do not include personal paths, account data, or tokens.
 
