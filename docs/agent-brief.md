@@ -3,7 +3,7 @@
 ## Project Snapshot
 
 - Last reviewed: 2026-07-16
-- Purpose: reversible Windows workaround for visible Codex Desktop Git/console windows.
+- Purpose: reversible Windows console-window guard for visible ChatGPT Codex Desktop Git, PowerShell, CMD, and conhost windows.
 - Project root: repository root; use relative paths and do not require a particular clone location.
 - Users: Windows users of ChatGPT Codex Desktop who see Git, PowerShell, CMD, or conhost flashes.
 - Scope: Windows only; support current `ChatGPT.exe` and legacy `Codex.exe` package names.

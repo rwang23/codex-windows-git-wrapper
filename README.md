@@ -1,6 +1,8 @@
-# Codex Windows Git Wrapper
+# ChatGPT Codex Windows Console Guard
 
 Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop app who see `git.exe`, `powershell.exe`, `cmd.exe`, or `conhost.exe` windows flash while Codex is working.
+
+The repository name describes the complete console-window guard. The Git wrapper remains a targeted component, so existing script names intentionally stay stable.
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
 
@@ -60,8 +62,8 @@ The guard is intentionally an observation-and-hide fallback. It never turns the 
 Clone the repository anywhere you prefer, then run the installer. This example uses a generic directory under your user profile, not a machine-specific project path:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"
-git clone https://github.com/rwang23/codex-windows-git-wrapper.git $repo
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+git clone https://github.com/rwang23/codex-windows-console-guard.git $repo
 & (Join-Path $repo "scripts\install.ps1")
 ```
 
@@ -84,7 +86,7 @@ The installer records the real Git, PowerShell, and Command Prompt paths inside 
 After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and console guard; it does not pull the repository or rebuild anything.
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
 
 `-Force` closes a running ChatGPT/Codex desktop process before restarting it. Save your work first, and **never run this command from an active Codex task**, because it will terminate that task.
@@ -92,7 +94,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $re
 If Codex is already closed, you can omit `-Force`:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling
 ```
 
 ### Optional launch switches
@@ -110,7 +112,7 @@ The optional switches address different symptoms. The console guard is for Codex
 Do not run `git pull` every time you launch Codex. Update only when you want a newer workaround version or need to repair the installed wrapper:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
 git -C $repo pull --ff-only
 & (Join-Path $repo "scripts\setup-and-start.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
@@ -118,7 +120,7 @@ git -C $repo pull --ff-only
 For a first-time clone-or-update from any directory, use:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-git-wrapper'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-git-wrapper.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-console-guard'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-console-guard.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
 ```
 
 Again, run a `-Force` command only from outside Codex.
@@ -128,7 +130,7 @@ Again, run a `-Force` command only from outside Codex.
 Status:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $repo "scripts\status.ps1")
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\status.ps1")
 ```
 
 The status report includes the detected app package, wrapper install path, real Git path, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
@@ -136,7 +138,7 @@ The status report includes the detected app package, wrapper install path, real 
 Rollback is simple. Close Codex, then run:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-git-wrapper"; & (Join-Path $repo "scripts\remove.ps1")
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\remove.ps1")
 ```
 
 No Git installation files need to be restored, because this project never changes them. You can also close Codex and launch it normally from the Start menu; the wrappers apply only to Codex launched by this project.
@@ -174,7 +176,7 @@ Give your agent this instruction:
 ```text
 I am on Windows and the ChatGPT Codex desktop app is flashing Git or console windows.
 
-Use https://github.com/rwang23/codex-windows-git-wrapper as a temporary local workaround.
+Use https://github.com/rwang23/codex-windows-console-guard as a temporary local workaround.
 
 Requirements:
 - Treat this as a Windows-only, cross-version (ChatGPT.exe and Codex.exe) compatibility tool.

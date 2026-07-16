@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Earlier history remains
 
 ### Changed
 
+- Renamed the public repository from `codex-windows-git-wrapper` to `codex-windows-console-guard` to describe its full targeted scope: Git, Command Prompt, PowerShell, conhost, and the process-aware console-window guard.
 - Expanded the guard beyond `ConsoleWindowClass` so it can suppress the persistent blank-window variant owned by the packaged Codex backend or its known console helpers.
 - Added coverage for the Chrome-parented `cmd.exe` native-messaging bridge used by the bundled Codex Chrome plugin.
 - Added a sparse startup/30-second existing-window scan to recover from process-ancestry timing races without introducing continuous process-table polling.
