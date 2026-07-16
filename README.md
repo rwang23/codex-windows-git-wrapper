@@ -1,5 +1,7 @@
 # ChatGPT Codex Windows Console Guard
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop app who see `git.exe`, `powershell.exe`, `cmd.exe`, `conhost.exe`, or blank Windows Terminal windows flash while Codex is working.
 
 The canonical launcher is `scripts\start-codex-with-console-guard.ps1`. `scripts\start-codex-with-git-wrapper.ps1` remains a compatibility forwarder for existing setups.
@@ -7,6 +9,55 @@ The canonical launcher is `scripts\start-codex-with-console-guard.ps1`. `scripts
 The wrapper deliberately keeps Codex's `powershell.exe` compatibility path on the configured Windows PowerShell executable. It does not silently replace that executable with `pwsh.exe`; use a separate PowerShell 7 terminal for work that explicitly needs PowerShell 7.
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
+
+## For Codex and other coding agents
+
+Start here. Give an agent this instruction before asking it to read the rest of the repository:
+
+```text
+I am on Windows and ChatGPT Codex Desktop is flashing Git, PowerShell, CMD, conhost, or blank Terminal windows.
+
+Use https://github.com/rwang23/codex-windows-console-guard as a reversible, Windows-only compatibility workaround.
+
+Execution order:
+1. Clone to a user-chosen local folder. Do not assume an existing absolute path.
+2. Run scripts\install.ps1 and scripts\status.ps1. Report the detected package, wrapper state, default-terminal mode, and any recent guard-log rule.
+3. If the symptom is a blank or focus-stealing `Terminal` / `CASCADIA_HOSTING_WINDOW_CLASS` window and status reports Automatic or Windows Terminal, explain the Console Host mitigation and apply it only with explicit user approval.
+4. If no matching guard-log rule exists, capture the owner/process symptom before broadening the workaround. Never hide all terminals or all console windows.
+
+Hard safety rules:
+- Do not replace, rename, patch, or manually copy the real Git executable.
+- Do not modify system PATH, user PATH, user TEMP/TMP, or machine TEMP/TMP.
+- Change the two per-user default-terminal delegation values only with explicit approval; preserve the generated backup and state the restore command.
+- A dedicated TEMP directory must remain wrapper-scoped, reversible, and leave its files in place when disabled.
+- Use scripts\setup-and-start.ps1 only when the user explicitly approves a Codex restart.
+- Never run a `-Force` launcher command from inside an active Codex task.
+- Before finishing, provide the external-PowerShell launch command and the scripts\remove.ps1 rollback command.
+```
+
+An agent may install and verify the files. A user should run the final `-Force` restart command from an external PowerShell window so no active task is interrupted.
+
+## Observed fix for brokered Windows Terminal flashes
+
+This repository originally focused on Git and shell wrapper windows. A separate symptom class is caused by **Automatic** default-terminal delegation: Windows can broker otherwise-unbound console UI through `WindowsTerminal.exe` / `OpenConsole.exe`, whose top-level `CASCADIA_HOSTING_WINDOW_CLASS` windows are service-owned rather than descendants of Codex. A process-ancestry guard cannot safely hide those windows without risking a user's legitimate terminal.
+
+In the Windows setup used to validate this project, explicitly selecting **Windows Console Host** stopped the observed brokered `Terminal` flashes. This is a targeted, reversible mitigation for that symptom class—not a claim to fix every Codex subprocess, CPU, MCP, or crash problem.
+
+Check the current mode first:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+& (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Status
+```
+
+If the reported mode is `Automatic` or `Windows Terminal` and the symptom matches, apply the change from an external PowerShell window:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+& (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
+```
+
+Only the current user's `HKCU\Console\%%Startup` delegation values change. Windows Terminal remains available when opened manually. Restore the exact saved values with `-Mode Restore`.
 
 ## What problem does it address?
 
@@ -51,7 +102,7 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory. They forward arguments, standard streams, and exit codes to the real executables without creating a console window.
 2. `scripts\start-codex-with-console-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
 3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it observes new top-level windows and uses a sparse startup/30-second rescan so process-ancestry races and persistent blank helper windows are not missed. A rescan reads the process graph only after it finds a visible candidate window, avoiding idle process-table polling.
-4. For systems where Windows Terminal delegation creates blank brokered windows, the explicit `-UseWindowsConsoleHost` switch selects the OS-supported legacy console host for unbound console launches. This avoids globally hiding `WindowsTerminal.exe`, which could also hide legitimate user terminals. The two GUID values follow Microsoft's documented [Default terminal application policy](https://learn.microsoft.com/windows/terminal/group-policy#default-terminal-application).
+4. For systems where Windows Terminal delegation creates blank brokered windows, the explicit `-UseWindowsConsoleHost` switch selects the OS-supported legacy console host for unbound console launches. In the captured brokered-window symptom class, this avoids the Windows Terminal/OpenConsole delegation path without globally hiding `WindowsTerminal.exe`, which could also hide legitimate user terminals. The two GUID values follow Microsoft's documented [Default terminal application policy](https://learn.microsoft.com/windows/terminal/group-policy#default-terminal-application).
 5. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
 6. The guard records each window it actually hides in `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin\codex-console-window-guard.log`. The log contains only a timestamp, PID, executable name, window class, and matching rule; it does not record command lines or window text.
 7. The optional Codex temporary-directory configuration is stored in the wrapper installation directory. Each wrapper child reads it and sets its own `TEMP` and `TMP`; it does not change the user-level or machine-level environment variables.
@@ -221,7 +272,7 @@ No matching log entry means the remaining window has a different owner/process g
 
 ### Blank Windows Terminal windows remain or steal focus
 
-Run `status.ps1` and check **Default terminal application**. If the mode is `Automatic` or `Windows Terminal`, and the unwanted window is titled `Terminal` with class `CASCADIA_HOSTING_WINDOW_CLASS`, apply the reversible compatibility mode from an external PowerShell window:
+This is a different symptom class from a guard-log match: Automatic default-terminal delegation can broker the visible UI through `WindowsTerminal.exe` / `OpenConsole.exe`, beyond a safe Codex process-ancestry match. Run `status.ps1` and check **Default terminal application**. If the mode is `Automatic` or `Windows Terminal`, and the unwanted window is titled `Terminal` with class `CASCADIA_HOSTING_WINDOW_CLASS`, apply the reversible compatibility mode from an external PowerShell window:
 
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
@@ -238,30 +289,6 @@ If the issue started after a Codex desktop update, capture the app package versi
 ### `fondue.exe` or a Windows Features dialog appears
 
 That is not part of the normal flow. It can occur when a managed wrapper cannot load its runtime. Run the installer again, check `status.ps1`, and then launch Codex through the standard launcher. Current native-wrapper builds avoid the known working-directory trigger.
-
-## For Codex and other AI coding agents
-
-Give your agent this instruction:
-
-```text
-I am on Windows and the ChatGPT Codex desktop app is flashing Git or console windows.
-
-Use https://github.com/rwang23/codex-windows-console-guard as a temporary local workaround.
-
-Requirements:
-- Treat this as a Windows-only, cross-version (ChatGPT.exe and Codex.exe) compatibility tool.
-- Clone the repository to a user-chosen local folder; do not assume an existing absolute path.
-- Do not replace, rename, patch, or manually copy my real Git executable.
-- Do not modify system PATH, user PATH, user TEMP/TMP, or machine TEMP/TMP. Modify the two per-user default-terminal registry values only when I explicitly approve `-UseWindowsConsoleHost`; preserve the generated backup.
-- A dedicated temporary directory must be wrapper-scoped, reversible, and leave its files in place on disable.
-- Run scripts\install.ps1 first and then scripts\status.ps1.
-- If Git detection fails, use Get-Command git -All and pass -RealGit with the real Git path.
-- Use scripts\setup-and-start.ps1 only when I explicitly approve a Codex restart.
-- Never run a -Force launcher command from inside an active Codex task.
-- Before finishing, report the external PowerShell launch command and the scripts\remove.ps1 rollback command.
-```
-
-An agent may install and verify the files, but a user should run the final `-Force` restart command from an external PowerShell window so no active task is interrupted.
 
 ## Contributing and verification
 
