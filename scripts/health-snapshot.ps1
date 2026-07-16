@@ -18,7 +18,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$capturedAtUtc = [DateTime]::UtcNow.ToString("o")
+$capturedAt = [DateTime]::UtcNow
+$capturedAtUtc = $capturedAt.ToString("o")
+$warningPolicy = [pscustomobject][ordered]@{
+    KernelWarningPrivateMB = 750.0
+    KernelCriticalPrivateMB = 1024.0
+    EmptyHostReviewAgeMinutes = 60.0
+    ServiceRootReviewAgeHours = 6.0
+    ServiceRootCountReview = 8
+}
 $allProcesses = @(Get-CimInstance Win32_Process -ErrorAction Stop)
 $processById = @{}
 $childrenByParent = @{}
@@ -81,6 +89,23 @@ function Get-ServiceKind {
     return $null
 }
 
+function Get-NodeRuntimeRole {
+    param($ProcessRecord)
+
+    $name = [string]$ProcessRecord.Name
+    $commandLine = [string]$ProcessRecord.CommandLine
+    if ($name -ieq "node_repl.exe") {
+        return "node-repl-host"
+    }
+    if ($name -ieq "node.exe" -and $commandLine -match '(?i)(^|[\\/])kernel\.js\b') {
+        return "node-kernel"
+    }
+    if ($name -ieq "codex.exe") {
+        return "codex-bridge"
+    }
+    return "runtime-child"
+}
+
 function Get-ProcessMetrics {
     param([int]$ProcessId)
 
@@ -117,6 +142,23 @@ function Get-SubtreeMetrics {
         PrivateMB = [math]::Round([double]$privateTotal, 1)
         WorkingSetMB = [math]::Round([double]$workingSetTotal, 1)
         CpuSeconds = [math]::Round([double]$cpuTotal, 2)
+    }
+}
+
+function Get-AgeMinutes {
+    param([string]$StartedAtUtc)
+
+    if (-not $StartedAtUtc) {
+        return $null
+    }
+    try {
+        $started = [DateTime]::Parse(
+            $StartedAtUtc,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [Globalization.DateTimeStyles]::RoundtripKind)
+        return [math]::Round(($script:capturedAt - $started.ToUniversalTime()).TotalMinutes, 1)
+    } catch {
+        return $null
     }
 }
 
@@ -174,6 +216,7 @@ foreach ($appServer in $appServerProcesses) {
             ParentProcessId = [int]$record.ParentProcessId
             Kind = [string]$candidateKinds[[int]$serviceRootId]
             StartedAtUtc = if ($rootMetrics) { $rootMetrics.StartedAtUtc } else { $null }
+            AgeMinutes = if ($rootMetrics) { Get-AgeMinutes -StartedAtUtc $rootMetrics.StartedAtUtc } else { $null }
             ProcessCount = $metrics.ProcessCount
             PrivateMB = $metrics.PrivateMB
             WorkingSetMB = $metrics.WorkingSetMB
@@ -213,6 +256,130 @@ $aggregateByKind = @($allServiceRoots |
             WorkingSetMB = [math]::Round([double](($_.Group | Measure-Object -Property WorkingSetMB -Sum).Sum), 1)
         }
     })
+
+$nodeRuntimeReports = [System.Collections.ArrayList]::new()
+$runtimeWarnings = [System.Collections.ArrayList]::new()
+foreach ($runtimeHost in @($allProcesses | Where-Object { $_.Name -ieq "node_repl.exe" } | Sort-Object ProcessId)) {
+    $hostId = [int]$runtimeHost.ProcessId
+    $componentIds = @($hostId) + @(Get-DescendantIds -RootProcessId $hostId)
+    $components = [System.Collections.ArrayList]::new()
+    foreach ($componentId in $componentIds) {
+        if (-not $processById.ContainsKey([int]$componentId)) {
+            continue
+        }
+        $componentRecord = $processById[[int]$componentId]
+        $componentMetrics = Get-ProcessMetrics -ProcessId ([int]$componentId)
+        if (-not $componentMetrics) {
+            continue
+        }
+        [void]$components.Add([pscustomobject][ordered]@{
+            ProcessId = [int]$componentId
+            ParentProcessId = [int]$componentRecord.ParentProcessId
+            Role = Get-NodeRuntimeRole -ProcessRecord $componentRecord
+            StartedAtUtc = $componentMetrics.StartedAtUtc
+            PrivateMB = $componentMetrics.PrivateMB
+            WorkingSetMB = $componentMetrics.WorkingSetMB
+            CpuSeconds = $componentMetrics.CpuSeconds
+        })
+    }
+
+    $hostComponent = @($components | Where-Object { $_.ProcessId -eq $hostId } | Select-Object -First 1)
+    $kernelComponents = @($components | Where-Object { $_.Role -eq "node-kernel" })
+    $runtimePrivateMB = [math]::Round([double](($components | Measure-Object -Property PrivateMB -Sum).Sum), 1)
+    $runtimeWorkingSetMB = [math]::Round([double](($components | Measure-Object -Property WorkingSetMB -Sum).Sum), 1)
+    $runtimeCpuSeconds = [math]::Round([double](($components | Measure-Object -Property CpuSeconds -Sum).Sum), 2)
+    $kernelPrivateMB = [math]::Round([double](($kernelComponents | Measure-Object -Property PrivateMB -Sum).Sum), 1)
+    $kernelCpuSeconds = [math]::Round([double](($kernelComponents | Measure-Object -Property CpuSeconds -Sum).Sum), 2)
+    $hostStartedAtUtc = if ($hostComponent.Count -gt 0) { $hostComponent[0].StartedAtUtc } else { $null }
+    $hostAgeMinutes = Get-AgeMinutes -StartedAtUtc $hostStartedAtUtc
+    $hostWarnings = [System.Collections.ArrayList]::new()
+
+    foreach ($kernel in $kernelComponents) {
+        if ($kernel.PrivateMB -ge $warningPolicy.KernelCriticalPrivateMB) {
+            $warning = [pscustomobject][ordered]@{
+                Severity = "critical"
+                Code = "node-kernel-private-memory-critical"
+                ProcessId = $kernel.ProcessId
+                Kind = "node-kernel"
+                ObservedValue = $kernel.PrivateMB
+                Threshold = $warningPolicy.KernelCriticalPrivateMB
+                Message = "Persistent Node kernel private memory exceeds the critical review threshold."
+            }
+            [void]$hostWarnings.Add($warning)
+            [void]$runtimeWarnings.Add($warning)
+        } elseif ($kernel.PrivateMB -ge $warningPolicy.KernelWarningPrivateMB) {
+            $warning = [pscustomobject][ordered]@{
+                Severity = "warning"
+                Code = "node-kernel-private-memory-high"
+                ProcessId = $kernel.ProcessId
+                Kind = "node-kernel"
+                ObservedValue = $kernel.PrivateMB
+                Threshold = $warningPolicy.KernelWarningPrivateMB
+                Message = "Persistent Node kernel private memory exceeds the review threshold."
+            }
+            [void]$hostWarnings.Add($warning)
+            [void]$runtimeWarnings.Add($warning)
+        }
+    }
+
+    if ($kernelComponents.Count -eq 0 -and $null -ne $hostAgeMinutes -and $hostAgeMinutes -ge $warningPolicy.EmptyHostReviewAgeMinutes) {
+        $warning = [pscustomobject][ordered]@{
+            Severity = "advisory"
+            Code = "long-lived-empty-node-repl-host"
+            ProcessId = $hostId
+            Kind = "node-repl-host"
+            ObservedValue = $hostAgeMinutes
+            Threshold = $warningPolicy.EmptyHostReviewAgeMinutes
+            Message = "Node REPL host has no active kernel and is old enough to review against the owning task lifecycle."
+        }
+        [void]$hostWarnings.Add($warning)
+        [void]$runtimeWarnings.Add($warning)
+    }
+
+    [void]$nodeRuntimeReports.Add([pscustomobject][ordered]@{
+        HostProcessId = $hostId
+        ParentProcessId = [int]$runtimeHost.ParentProcessId
+        StartedAtUtc = $hostStartedAtUtc
+        AgeMinutes = $hostAgeMinutes
+        ProcessCount = $components.Count
+        PrivateMB = $runtimePrivateMB
+        WorkingSetMB = $runtimeWorkingSetMB
+        CpuSeconds = $runtimeCpuSeconds
+        KernelCount = $kernelComponents.Count
+        KernelPrivateMB = $kernelPrivateMB
+        KernelCpuSeconds = $kernelCpuSeconds
+        Components = @($components)
+        Warnings = @($hostWarnings)
+    })
+}
+
+foreach ($serviceRoot in $allServiceRoots) {
+    if ($null -ne $serviceRoot.AgeMinutes -and $serviceRoot.AgeMinutes -ge ($warningPolicy.ServiceRootReviewAgeHours * 60.0)) {
+        [void]$runtimeWarnings.Add([pscustomobject][ordered]@{
+            Severity = "advisory"
+            Code = "long-lived-service-root"
+            ProcessId = $serviceRoot.ProcessId
+            Kind = $serviceRoot.Kind
+            ObservedValue = [math]::Round($serviceRoot.AgeMinutes / 60.0, 1)
+            Threshold = $warningPolicy.ServiceRootReviewAgeHours
+            Message = "Service root is old enough to compare with its owning task lifecycle."
+        })
+    }
+}
+
+foreach ($kindAggregate in $aggregateByKind) {
+    if ($kindAggregate.RootCount -ge $warningPolicy.ServiceRootCountReview) {
+        [void]$runtimeWarnings.Add([pscustomobject][ordered]@{
+            Severity = "advisory"
+            Code = "high-service-root-count"
+            ProcessId = $null
+            Kind = $kindAggregate.Kind
+            ObservedValue = $kindAggregate.RootCount
+            Threshold = $warningPolicy.ServiceRootCountReview
+            Message = "High root count is a review signal only; active task count must be checked before cleanup."
+        })
+    }
+}
 
 $detachedCandidates = [System.Collections.ArrayList]::new()
 foreach ($process in $allProcesses) {
@@ -298,10 +465,14 @@ $snapshot = [pscustomobject][ordered]@{
     SchemaVersion = 1
     CapturedAtUtc = $capturedAtUtc
     ReadOnly = $true
+    AutomaticCleanup = $false
+    WarningPolicy = $warningPolicy
     CodexDesktopPackageVersion = $packageVersion
     AppServerCount = $appServerReports.Count
     AppServers = @($appServerReports)
     AggregateByKind = @($aggregateByKind)
+    NodeRuntimes = @($nodeRuntimeReports)
+    RuntimeWarnings = @($runtimeWarnings)
     DetachedCandidates = @($detachedCandidates)
     BbBrowser = $bbBrowser
 }
@@ -319,6 +490,22 @@ Write-Output ""
 Write-Output "Service roots by kind:"
 if ($snapshot.AggregateByKind.Count -gt 0) {
     $snapshot.AggregateByKind | Format-Table Kind, RootCount, ProcessCount, PrivateMB, WorkingSetMB -AutoSize | Out-String -Width 200 | Write-Output
+} else {
+    Write-Output "  None"
+}
+
+Write-Output "Node runtimes:"
+if ($snapshot.NodeRuntimes.Count -gt 0) {
+    $snapshot.NodeRuntimes |
+        Select-Object HostProcessId, AgeMinutes, ProcessCount, PrivateMB, KernelCount, KernelPrivateMB, KernelCpuSeconds, @{Name="WarningCount"; Expression={ $_.Warnings.Count }} |
+        Format-Table -AutoSize | Out-String -Width 200 | Write-Output
+} else {
+    Write-Output "  None"
+}
+
+Write-Output "Advisory warnings (no automatic cleanup):"
+if ($snapshot.RuntimeWarnings.Count -gt 0) {
+    $snapshot.RuntimeWarnings | Format-Table Severity, Code, ProcessId, Kind, ObservedValue, Threshold -AutoSize | Out-String -Width 220 | Write-Output
 } else {
     Write-Output "  None"
 }

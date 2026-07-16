@@ -50,14 +50,30 @@ if ($snapshot.ReadOnly -ne $true) {
 if (-not $snapshot.CapturedAtUtc) {
     throw "Health snapshot did not include a capture timestamp."
 }
-if ($null -eq $snapshot.AppServers -or $null -eq $snapshot.AggregateByKind -or $null -eq $snapshot.DetachedCandidates) {
+if ($null -eq $snapshot.AppServers -or $null -eq $snapshot.AggregateByKind -or $null -eq $snapshot.NodeRuntimes -or $null -eq $snapshot.RuntimeWarnings -or $null -eq $snapshot.DetachedCandidates) {
     throw "Health snapshot omitted a required collection."
+}
+if ($snapshot.AutomaticCleanup -ne $false) {
+    throw "Health snapshot must explicitly disable automatic cleanup."
+}
+if ($snapshot.WarningPolicy.KernelWarningPrivateMB -ne 750 -or $snapshot.WarningPolicy.KernelCriticalPrivateMB -ne 1024) {
+    throw "Health snapshot warning thresholds changed unexpectedly."
 }
 if ($json -match '(?i)CommandLine|"token"') {
     throw "Health snapshot exposed a command line or daemon token field."
 }
 if ($snapshot.BbBrowser.Registered -and -not $snapshot.BbBrowser.DaemonProcessId) {
     throw "Registered BB Browser daemon is missing its process ID."
+}
+foreach ($runtime in @($snapshot.NodeRuntimes)) {
+    $hostComponents = @($runtime.Components | Where-Object { $_.Role -eq "node-repl-host" -and $_.ProcessId -eq $runtime.HostProcessId })
+    if ($hostComponents.Count -ne 1) {
+        throw "Node runtime did not identify exactly one host component."
+    }
+    $kernelCount = @($runtime.Components | Where-Object { $_.Role -eq "node-kernel" }).Count
+    if ($runtime.KernelCount -ne $kernelCount) {
+        throw "Node runtime kernel summary does not match its components."
+    }
 }
 
 Write-Output "Health snapshot regression checks: PASS"
