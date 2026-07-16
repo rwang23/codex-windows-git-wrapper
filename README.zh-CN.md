@@ -6,6 +6,12 @@
 
 它支持当前 Microsoft Store / MSIX 包中的 `ChatGPT.exe`，也兼容旧版 `Codex.exe`。它不是 macOS/Linux 工具，也不会替换真实 Git。
 
+## 搜索关键词
+
+`ChatGPT Codex Windows`、`Codex Windows 弹窗`、`Codex Git 弹窗`、`git.exe 闪现`、`PowerShell 弹窗`、`CMD 闪现`、`conhost.exe 闪现`、`Windows Terminal 空白窗口`、`Terminal 抢焦点`、`CASCADIA_HOSTING_WINDOW_CLASS` 和 `Codex 控制台窗口`。
+
+如果遇到的是 Codex 高 CPU、反复 shell/进程活动、MCP 进程增长或桌面端闪退，应将其视为需要上游诊断的问题，而不代表本 guard 能修复 CPU 或闪退缺陷。
+
 ## 给 Codex / 编程 Agent 的最快安全路径
 
 在让 Agent 处理问题前，可直接交给它以下说明：

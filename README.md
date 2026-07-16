@@ -10,6 +10,12 @@ The wrapper deliberately keeps Codex's `powershell.exe` compatibility path on th
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
 
+## Search terms
+
+`ChatGPT Codex Windows`, `Codex Desktop Windows`, `Codex Git popup`, `git.exe flashing`, `PowerShell popup`, `cmd.exe flicker`, `conhost.exe flash`, `blank Windows Terminal`, `focus-stealing Terminal`, `CASCADIA_HOSTING_WINDOW_CLASS`, and `Codex console window`.
+
+For nearby but separate reports such as Codex high CPU, repeated shell/process activity, MCP process growth, or desktop crashes, treat them as upstream diagnostic problems rather than evidence that this guard will fix CPU or crash defects.
+
 ## For Codex and other coding agents
 
 Start here. Give an agent this instruction before asking it to read the rest of the repository:
