@@ -3,7 +3,7 @@
 ## Project Snapshot
 
 - Last reviewed: 2026-07-16
-- Purpose: reversible Windows console-window guard for visible ChatGPT Codex Desktop Git, PowerShell, CMD, and conhost windows.
+- Purpose: reversible Windows console-window guard for visible ChatGPT Codex Desktop Git, PowerShell, CMD, conhost, and brokered Windows Terminal windows.
 - Project root: repository root; use relative paths and do not require a particular clone location.
 - Users: Windows users of ChatGPT Codex Desktop who see Git, PowerShell, CMD, or conhost flashes.
 - Scope: Windows only; support current `ChatGPT.exe` and legacy `Codex.exe` package names.
@@ -15,7 +15,7 @@
 ## Read First
 
 1. `README.md` for install, launch, rollback, and user-facing safety rules.
-2. `scripts\install.ps1` and `scripts\start-codex-with-console-guard.ps1` before changing installation or launch behavior.
+2. `scripts\install.ps1`, `scripts\start-codex-with-console-guard.ps1`, and `scripts\configure-default-terminal.ps1` before changing installation or launch behavior.
 3. `scripts\codex-package.ps1` before changing package/process discovery.
 4. `src\CodexConsoleWindowGuard.cpp` and `tests\console-window-guard-regression.ps1` before changing window filtering.
 
@@ -24,7 +24,8 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 ## Design Constraints
 
 - Never replace, rename, patch, or manually copy the user's real `git.exe`.
-- Never persist the wrapper directory in system/user `PATH` or modify the registry.
+- Never persist the wrapper directory in system/user `PATH`.
+- Leave the registry untouched by default. The explicit `-UseWindowsConsoleHost` path may change only `HKCU\Console\%%Startup` values `DelegationConsole` and `DelegationTerminal`, with exact backup and restore coverage.
 - Keep wrappers process-local to Codex launches.
 - Keep the guard narrowly scoped to an exact window owner/process graph: targeted shell owners under ChatGPT/Codex, packaged Codex backend/helper owners under `ChatGPT.exe`, or a Chrome-parented `cmd.exe` native-host bridge. Never hide arbitrary descendants or all windows of a generic class.
 - Preserve the bounded, command-line-free guard log and its 1 MiB truncation limit.
@@ -37,6 +38,7 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 - Documentation-only change: update `README.md`, then verify links, portability, and `git diff --check`.
 - Wrapper/launcher behavior change: change the smallest relevant source/script and run the focused regression test.
 - Package-name or process-tree change: cover both `ChatGPT.exe` and `Codex.exe` in the guard/package tests.
+- Default-terminal change: use an isolated HKCU test key, verify idempotent backup, and restore the original values exactly.
 - Upstream Windows issue research: distinguish visible-window mitigation from the root Git polling, process leak, CPU, or crash issue; do not claim this repository fixes the upstream cause.
 - GitHub issue/comment/push: requires explicit user authorization and fresh remote/issue readback.
 
@@ -53,6 +55,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\status.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\install-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\launcher-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\console-window-guard-regression.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\default-terminal-regression.ps1
 ```
 
 ## Verification Rules
@@ -79,6 +82,7 @@ This project has no production service or customer data. Before a public GitHub 
 - `scripts\start-codex-with-console-guard.ps1`: canonical launcher for the process-local wrapper environment and console guard.
 - `scripts\start-codex-with-git-wrapper.ps1`: compatibility forwarder for older commands; new docs must use the canonical launcher.
 - `scripts\status.ps1`: read-only install/runtime diagnostics.
+- `scripts\configure-default-terminal.ps1`: opt-in current-user Console Host mitigation with exact backup/restore.
 - `scripts\remove.ps1`: removes the local wrapper/guard install.
 - `tests\*.ps1`: focused Windows regression checks.
 
@@ -86,5 +90,6 @@ This project has no production service or customer data. Before a public GitHub 
 
 - MSIX files under `WindowsApps` can deny a normal `Test-Path` check even when the app can launch; use the manifest-derived package information.
 - Some MSIX activation paths bypass process-local `PATH`. The console guard is the fallback for targeted shell/backend/native-host windows, not a global console suppressor.
+- Automatic default-terminal selection can broker console UI through `WindowsTerminal.exe` and `OpenConsole.exe`, whose service-owned process graph cannot be safely attributed to Codex. Prefer the explicit, reversible Console Host mode over hiding all Windows Terminal windows.
 - Current Codex builds can retain duplicate MCP process pools. The guard may hide their launcher windows, but it must not claim to deduplicate or reap those processes.
 - `-DisableShellSnapshot` and `-SuppressProcessSampling` target separate PowerShell/process-telemetry symptoms and have documented trade-offs.

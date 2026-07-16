@@ -15,6 +15,8 @@ $cmdConfig = Join-Path $InstallDir "real-cmd.txt"
 $kindConfig = Join-Path $InstallDir "wrapper-kind.txt"
 $consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
 $consoleWindowGuardLog = Join-Path $InstallDir "codex-console-window-guard.log"
+$defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
+$defaultTerminalBackup = Join-Path $InstallDir "default-terminal-backup.json"
 $packageInfo = Resolve-CodexDesktopPackage
 $package = $packageInfo.Package
 
@@ -112,6 +114,14 @@ if ($git) {
 }
 
 Write-Output ""
+Write-Output "Default terminal application:"
+if (Test-Path -LiteralPath $defaultTerminalScript -PathType Leaf) {
+    & $defaultTerminalScript -Mode Status -BackupPath $defaultTerminalBackup
+} else {
+    Write-Output "  Configuration helper missing: $defaultTerminalScript"
+}
+
+Write-Output ""
 Write-Output "Codex Windows console guard:"
 if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
     $runningGuard = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
@@ -205,10 +215,13 @@ if (-not $foundHelperRoot) {
 
 Write-Output ""
 Write-Output "Persistent PATH checks:"
+$normalizedInstallDir = [Environment]::ExpandEnvironmentVariables($InstallDir).TrimEnd("\")
 $userPathHasWrapper = ([Environment]::GetEnvironmentVariable("Path", "User") -split ";") |
-    Where-Object { $_ -like "*codex-git-wrapper*" }
+    ForEach-Object { [Environment]::ExpandEnvironmentVariables(([string]$_).Trim()).TrimEnd("\") } |
+    Where-Object { $_ -and $_ -ieq $normalizedInstallDir }
 $machinePathHasWrapper = ([Environment]::GetEnvironmentVariable("Path", "Machine") -split ";") |
-    Where-Object { $_ -like "*codex-git-wrapper*" }
+    ForEach-Object { [Environment]::ExpandEnvironmentVariables(([string]$_).Trim()).TrimEnd("\") } |
+    Where-Object { $_ -and $_ -ieq $normalizedInstallDir }
 Write-Output "  User PATH contains wrapper: $([bool]$userPathHasWrapper)"
 Write-Output "  Machine PATH contains wrapper: $([bool]$machinePathHasWrapper)"
 

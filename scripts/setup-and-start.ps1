@@ -2,6 +2,7 @@ param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
+    [switch]$UseWindowsConsoleHost,
     [string]$RealGit,
     [string]$RealPowerShell,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin")
@@ -14,8 +15,9 @@ $installScript = Join-Path $scriptsDir "install.ps1"
 $statusScript = Join-Path $scriptsDir "status.ps1"
 $startScript = Join-Path $scriptsDir "start-codex-with-console-guard.ps1"
 $packageScript = Join-Path $scriptsDir "codex-package.ps1"
+$defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
 
-foreach ($script in @($installScript, $statusScript, $startScript, $packageScript)) {
+foreach ($script in @($installScript, $statusScript, $startScript, $packageScript, $defaultTerminalScript)) {
     if (-not (Test-Path -LiteralPath $script)) {
         throw "Required script not found: $script"
     }
@@ -53,10 +55,27 @@ if ($RealPowerShell) {
 
 Write-Output "Installing or refreshing Codex Windows Console Guard..."
 & powershell -NoProfile @installArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "Console Guard installation failed with exit code $LASTEXITCODE."
+}
+
+if ($UseWindowsConsoleHost) {
+    Write-Output ""
+    Write-Output "Applying the reversible Windows Console Host compatibility mode..."
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $defaultTerminalScript `
+        -Mode ConsoleHost `
+        -BackupPath (Join-Path $InstallDir "default-terminal-backup.json")
+    if ($LASTEXITCODE -ne 0) {
+        throw "Default-terminal configuration failed with exit code $LASTEXITCODE."
+    }
+}
 
 Write-Output ""
 Write-Output "Checking wrapper status..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File $statusScript -InstallDir $InstallDir
+if ($LASTEXITCODE -ne 0) {
+    throw "Console Guard status check failed with exit code $LASTEXITCODE."
+}
 
 $startArgs = @(
     "-ExecutionPolicy", "Bypass",
@@ -77,6 +96,9 @@ if ($DisableShellSnapshot) {
 if ($SuppressProcessSampling) {
     $startArgs += "-SuppressProcessSampling"
 }
+if ($UseWindowsConsoleHost) {
+    $startArgs += "-UseWindowsConsoleHost"
+}
 
 if ($Force) {
     $startArgs += "-Force"
@@ -85,3 +107,6 @@ if ($Force) {
 Write-Output ""
 Write-Output "Starting Codex..."
 & powershell -NoProfile @startArgs
+if ($LASTEXITCODE -ne 0) {
+    throw "Codex launcher failed with exit code $LASTEXITCODE."
+}

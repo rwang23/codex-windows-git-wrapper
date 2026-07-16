@@ -6,6 +6,8 @@ All notable changes to this project are documented here. Earlier history remains
 
 ### Changed
 
+- Added a reversible `-UseWindowsConsoleHost` compatibility mode for blank, focus-stealing Windows Terminal windows created when automatic terminal delegation brokers Codex console launches through `svchost.exe`.
+- Extended status diagnostics with the current default-terminal mode and corrected persistent `PATH` checks to compare the actual wrapper install directory.
 - Promoted `scripts\start-codex-with-console-guard.ps1` to the canonical launcher and retained `scripts\start-codex-with-git-wrapper.ps1` as a compatibility forwarder.
 - Renamed the public repository from `codex-windows-git-wrapper` to `codex-windows-console-guard` to describe its full targeted scope: Git, Command Prompt, PowerShell, conhost, and the process-aware console-window guard.
 - Expanded the guard beyond `ConsoleWindowClass` so it can suppress the persistent blank-window variant owned by the packaged Codex backend or its known console helpers.
@@ -15,6 +17,7 @@ All notable changes to this project are documented here. Earlier history remains
 
 ### Added
 
+- An isolated registry regression test plus `scripts\configure-default-terminal.ps1`, which backs up and restores only the two current-user terminal delegation values.
 - A bounded diagnostic log containing only matched PID, executable, window class, and rule information.
 - Status output and regression coverage for the diagnostic log and the new process-graph rules.
 

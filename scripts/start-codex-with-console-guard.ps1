@@ -2,6 +2,7 @@ param(
     [switch]$Force,
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
+    [switch]$UseWindowsConsoleHost,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin"),
     [string]$RealGit,
     [string]$RealPowerShell
@@ -10,6 +11,16 @@ param(
 $ErrorActionPreference = "Stop"
 $scriptsDir = Split-Path -Parent $PSCommandPath
 . (Join-Path $scriptsDir "codex-package.ps1")
+$defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
+
+if ($UseWindowsConsoleHost) {
+    if (-not (Test-Path -LiteralPath $defaultTerminalScript -PathType Leaf)) {
+        throw "Default-terminal configuration script is missing: $defaultTerminalScript"
+    }
+    & $defaultTerminalScript `
+        -Mode ConsoleHost `
+        -BackupPath (Join-Path $InstallDir "default-terminal-backup.json")
+}
 
 function Resolve-ConfiguredRealGit {
     param(
