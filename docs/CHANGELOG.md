@@ -20,6 +20,8 @@ All notable changes to this project are documented here. Earlier history remains
 - An isolated registry regression test plus `scripts\configure-default-terminal.ps1`, which backs up and restores only the two current-user terminal delegation values.
 - A bounded diagnostic log containing only matched PID, executable, window class, and rule information.
 - Status output and regression coverage for the diagnostic log and the new process-graph rules.
+- A read-only `scripts\health-snapshot.ps1` command with JSON output, stdio/MCP service-root aggregation, detached-candidate reporting, and BB Browser daemon health checks that never expose command lines or daemon tokens.
+- A focused health-snapshot regression test that checks the no-mutation boundary and the versioned JSON contract.
 
 ## [2026-07-15]
 

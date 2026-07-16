@@ -141,6 +141,22 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 
 The status report includes the detected app package, wrapper install path, real Git path, current default-terminal mode, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
 
+### Read-only process health snapshot
+
+Use the separate health snapshot when Codex feels slow or its stdio/MCP process count appears to grow:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\health-snapshot.ps1")
+```
+
+For machine-readable output:
+
+```powershell
+& .\scripts\health-snapshot.ps1 -AsJson
+```
+
+The snapshot groups service roots beneath each Codex `app-server`, aggregates their process counts and memory, reports detached service candidates, and checks BB Browser daemon registration plus listener ownership. It is deliberately observation-only: it does not start, stop, suspend, or modify processes, files, services, configuration, or the registry. Command lines and the BB Browser daemon token are never included in its output. Generic plugin entrypoints are reported as `plugin-mcp-cjs` or `plugin-mcp-mjs`; the script does not guess a plugin identity that Windows cannot prove from the process surface.
+
 Rollback is simple. Close Codex, then run:
 
 ```powershell
@@ -219,6 +235,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\install-regression.p
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\launcher-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\console-window-guard-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\default-terminal-regression.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\health-snapshot-regression.ps1
 ```
 
 The console-guard test simulates both `ChatGPT.exe` and legacy `Codex.exe` launching a Git console process, verifies diagnostic logging, and asserts process-graph rules for shell launchers, the packaged Codex backend, and the Chrome native-host bridge. It skips only when no native compiler is available.
