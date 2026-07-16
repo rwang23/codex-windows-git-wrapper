@@ -245,6 +245,8 @@ For machine-readable output:
 
 The snapshot groups service roots beneath each Codex `app-server`, aggregates their process counts and memory, reports detached service candidates, and checks BB Browser daemon registration plus listener ownership. It is deliberately observation-only: it does not start, stop, suspend, or modify processes, files, services, configuration, or the registry. Command lines and the BB Browser daemon token are never included in its output. Generic plugin entrypoints are reported as `plugin-mcp-cjs` or `plugin-mcp-mjs`; the script does not guess a plugin identity that Windows cannot prove from the process surface.
 
+For the full multi-task investigation, including CodeGraph `--liftoff-only`, Node REPL host/kernel/bridge interpretation, MCP/Skill boundaries, incremental pre-compaction cards, BB Browser daemon recovery, Docker/WSL limits, upgrade checks, and rollback, see the [Simplified Chinese Windows performance runbook](docs/codex-desktop-performance-runbook.zh-CN.md).
+
 Rollback is simple. Close Codex, then run:
 
 ```powershell

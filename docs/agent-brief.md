@@ -19,6 +19,7 @@
 3. `scripts\codex-package.ps1` before changing package/process discovery.
 4. `src\CodexConsoleWindowGuard.cpp` and `tests\console-window-guard-regression.ps1` before changing window filtering.
 5. `scripts\health-snapshot.ps1` and `tests\health-snapshot-regression.ps1` before changing process-health diagnostics.
+6. `docs\codex-desktop-performance-runbook.zh-CN.md` before changing the documented CodeGraph, Node REPL, BB Browser, pre-compaction, MCP, or Docker/WSL optimization guidance.
 
 Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires it.
 
@@ -94,6 +95,7 @@ This project has no production service or customer data. Before a public GitHub 
 - `scripts\start-codex-with-git-wrapper.ps1`: compatibility forwarder for older commands; new docs must use the canonical launcher.
 - `scripts\status.ps1`: read-only install/runtime diagnostics.
 - `scripts\health-snapshot.ps1`: read-only Codex app-server, stdio/MCP service-root, detached-candidate, memory, and BB Browser daemon diagnostics.
+- `docs\codex-desktop-performance-runbook.zh-CN.md`: dated evidence, explanation, upgrade checks, activation boundaries, and rollback for the Windows multi-task performance investigation.
 - `scripts\configure-default-terminal.ps1`: opt-in current-user Console Host mitigation with exact backup/restore.
 - `scripts\configure-codex-temp.ps1`: opt-in wrapper-scoped temporary directory with backup/restore of its local configuration only.
 - `scripts\remove.ps1`: removes the local wrapper/guard install.
@@ -106,4 +108,5 @@ This project has no production service or customer data. Before a public GitHub 
 - Automatic default-terminal selection can broker console UI through `WindowsTerminal.exe` and `OpenConsole.exe`, whose service-owned process graph cannot be safely attributed to Codex. Prefer the explicit, reversible Console Host mode over hiding all Windows Terminal windows.
 - The MSIX/AppX fallback can bypass process-local environment inheritance. A dedicated TEMP directory is therefore a wrapper-child optimization, not a claim that every Desktop Codex process will use it.
 - Current Codex builds can retain duplicate MCP process pools. The guard may hide their launcher windows, but it must not claim to deduplicate or reap those processes.
+- CodeGraph, Node REPL, BB Browser, pre-compaction, and Docker/WSL guidance is diagnostic and reversible. Keep the dated case evidence distinct from current runtime claims, and never turn advisory PID/age thresholds into automatic process termination.
 - `-DisableShellSnapshot` and `-SuppressProcessSampling` target separate PowerShell/process-telemetry symptoms and have documented trade-offs.

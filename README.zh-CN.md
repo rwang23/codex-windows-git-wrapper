@@ -153,6 +153,8 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 
 ## 状态、更新与回滚
 
+如果问题是多个长期任务下的 CPU、内存或 stdio/MCP 进程增长，请先阅读 [Codex Desktop Windows 性能诊断与优化运行手册](docs/codex-desktop-performance-runbook.zh-CN.md)。其中记录了本次 CodeGraph、Node REPL、MCP、pre-compact hook、BB Browser 与 Docker/WSL 调整的原理、升级后检查和回滚方式。
+
 查看状态：
 
 ```powershell

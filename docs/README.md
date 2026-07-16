@@ -4,11 +4,13 @@
 
 1. The root [README](../README.md): public installation, launch, troubleshooting, and rollback guide.
 2. The [agent brief](agent-brief.md): compact maintenance router for coding agents and contributors.
+3. The [Windows performance runbook (Simplified Chinese)](codex-desktop-performance-runbook.zh-CN.md): evidence-based Codex Desktop process, MCP, CodeGraph, Node REPL, BB Browser, pre-compaction, and Docker/WSL diagnosis with upgrade checks and rollback.
 
 ## Documentation Map
 
 - [README](../README.md) is the source of truth for end-user behavior and safety boundaries.
 - [Agent brief](agent-brief.md) is the source of truth for maintenance routing and verification.
+- [Windows performance runbook (Simplified Chinese)](codex-desktop-performance-runbook.zh-CN.md) is the operating reference for multi-task performance diagnosis and reversible local optimizations.
 - [Changelog](CHANGELOG.md) records notable delivered changes after this documentation baseline was introduced.
 
 ## Maintenance Rules

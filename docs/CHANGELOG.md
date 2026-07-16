@@ -9,6 +9,7 @@ All notable changes to this project are documented here. Earlier history remains
 - Added concise bilingual search terms for the Windows popup/console symptom family, while explicitly separating the guard from upstream CPU and crash fixes.
 - Added an agent-first operating brief at the top of the English README and a linked Simplified Chinese README.
 - Clarified the observed brokered-window mitigation: switching the current user's default terminal from Automatic/Windows Terminal delegation to Windows Console Host stopped the captured `Terminal` flash symptom, while remaining a reversible, symptom-specific workaround rather than a claim to fix every Codex performance or stability issue.
+- Added a Simplified Chinese Windows performance runbook covering the multi-task process model, MCP/Skill boundaries, CodeGraph `--liftoff-only`, Node REPL diagnostics, incremental pre-compaction cards, BB Browser daemon recovery, Docker/WSL resource limits, update checks, and rollback.
 
 ### Changed
 
