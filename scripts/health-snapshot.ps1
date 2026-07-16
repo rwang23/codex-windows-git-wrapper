@@ -163,7 +163,11 @@ function Get-AgeMinutes {
 }
 
 $appServerProcesses = @($allProcesses | Where-Object {
-    $_.Name -ieq "codex.exe" -and ([string]$_.CommandLine) -match '(?i)\bapp-server\b'
+    if ($_.Name -ine "codex.exe" -or ([string]$_.CommandLine) -notmatch '(?i)\bapp-server\b') {
+        return $false
+    }
+    $parentId = [int]$_.ParentProcessId
+    return (-not $processById.ContainsKey($parentId) -or $processById[$parentId].Name -ine "node_repl.exe")
 })
 $appServerReports = [System.Collections.ArrayList]::new()
 $allServiceRoots = [System.Collections.ArrayList]::new()

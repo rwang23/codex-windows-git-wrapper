@@ -65,6 +65,9 @@ if ($json -match '(?i)CommandLine|"token"') {
 if ($snapshot.BbBrowser.Registered -and -not $snapshot.BbBrowser.DaemonProcessId) {
     throw "Registered BB Browser daemon is missing its process ID."
 }
+if (@($snapshot.AppServers | Where-Object { $_.ParentName -ieq "node_repl.exe" }).Count -gt 0) {
+    throw "Node REPL bridge was misclassified as a top-level app-server."
+}
 foreach ($runtime in @($snapshot.NodeRuntimes)) {
     $hostComponents = @($runtime.Components | Where-Object { $_.Role -eq "node-repl-host" -and $_.ProcessId -eq $runtime.HostProcessId })
     if ($hostComponents.Count -ne 1) {
