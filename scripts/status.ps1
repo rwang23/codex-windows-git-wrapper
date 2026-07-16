@@ -131,7 +131,7 @@ if (Test-Path -LiteralPath $codexTempScript -PathType Leaf) {
 }
 
 Write-Output ""
-Write-Output "Codex Windows console guard:"
+Write-Output "Codex Windows Guard:"
 if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
     $runningGuard = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
         Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } } |
@@ -144,7 +144,7 @@ if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
 }
 
 Write-Output ""
-Write-Output "Codex console window guard log:"
+Write-Output "Codex Windows Guard log:"
 Write-Output "  Path: $consoleWindowGuardLog"
 if (Test-Path -LiteralPath $consoleWindowGuardLog -PathType Leaf) {
     $logItem = Get-Item -LiteralPath $consoleWindowGuardLog

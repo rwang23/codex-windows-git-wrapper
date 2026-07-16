@@ -1,4 +1,4 @@
-# ChatGPT Codex Windows Console Guard
+# ChatGPT Codex Windows Guard
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
@@ -13,7 +13,7 @@
 ```text
 我在 Windows 上使用 ChatGPT Codex Desktop，出现 Git、PowerShell、CMD、conhost 或空白 Terminal 窗口闪现的问题。
 
-请使用 https://github.com/rwang23/codex-windows-console-guard 作为可逆的、本地 Windows 兼容方案。
+请使用 https://github.com/rwang23/codex-windows-guard 作为可逆的、本地 Windows 兼容方案。
 
 执行顺序：
 1. 克隆到用户自行选择的本地目录；不要假定已有绝对路径。
@@ -44,21 +44,21 @@ Agent 可以安装和验证文件；最终带 `-Force` 的重启命令应由用�
 先查看当前模式：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Status
 ```
 
 若显示 `Automatic` 或 `Windows Terminal`，且窗口标题为 `Terminal`、窗口类为 `CASCADIA_HOSTING_WINDOW_CLASS`，可在外部 PowerShell 中启用 Console Host：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
 ```
 
 它只改动当前用户 `HKCU\Console\%%Startup` 下的两个终端委派值；不会卸载或禁用 Windows Terminal，仍可手动打开。恢复原始值：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Restore
 ```
 
@@ -85,8 +85,8 @@ Codex Desktop 有时会从 GUI / MSIX 进程启动 Git 或 PowerShell。Git for 
 请在任意希望存放仓库的位置克隆。以下示例不依赖个人绝对路径：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
-git clone https://github.com/rwang23/codex-windows-console-guard.git $repo
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
+git clone https://github.com/rwang23/codex-windows-guard.git $repo
 & (Join-Path $repo "scripts\install.ps1")
 ```
 
@@ -109,7 +109,7 @@ Get-Command git -All
 首次安装后，从 **外部 PowerShell** 运行：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
 
 `-Force` 会关闭当前正在运行的 ChatGPT/Codex Desktop 并重启。请先保存工作；不要在一个活跃 Codex 任务内运行它。
@@ -117,7 +117,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 如果 Codex 已关闭，去掉 `-Force`：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
 ```
 
 ## 可选开关
@@ -134,14 +134,14 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 若公共 `%TEMP%` 累积了大量临时文件，Git、PowerShell、CMD 等 wrapper 子进程可能在创建、扫描或清理文件时变慢。建议使用 SSD/NVMe 上的目录：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Enable -TempDir "C:\CodexTemp"
 ```
 
 它只对 Codex wrapper 启动的 `git.exe`、`powershell.exe`、`cmd.exe` 及其子进程设置 `TEMP`/`TMP`；不改变用户或系统环境变量。停用但保留其中文件：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
 ```
 
@@ -150,21 +150,21 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
 查看状态：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\status.ps1")
 ```
 
 需要更新或修复安装时，再运行：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\setup-and-start.ps1") -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
 ```
 
 完整回滚：关闭 Codex 后，在外部 PowerShell 运行：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Restore
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
 & (Join-Path $repo "scripts\remove.ps1")

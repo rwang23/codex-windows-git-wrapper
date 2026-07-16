@@ -1,4 +1,4 @@
-# Legacy compatibility entry point. Prefer start-codex-with-console-guard.ps1
+# Legacy compatibility entry point. Prefer start-codex-with-windows-guard.ps1
 # for new integrations and documentation.
 param(
     [switch]$Force,
@@ -12,9 +12,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$canonicalLauncher = Join-Path $PSScriptRoot "start-codex-with-console-guard.ps1"
+$canonicalLauncher = Join-Path $PSScriptRoot "start-codex-with-windows-guard.ps1"
 if (-not (Test-Path -LiteralPath $canonicalLauncher)) {
-    throw "Canonical console-guard launcher is missing: $canonicalLauncher"
+    throw "Canonical Windows Guard launcher is missing: $canonicalLauncher"
 }
 
 $forwardedArguments = @{ InstallDir = $InstallDir }

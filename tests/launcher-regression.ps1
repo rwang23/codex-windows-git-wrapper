@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $helperScript = Join-Path $repoRoot "scripts\codex-package.ps1"
-$canonicalLauncher = Join-Path $repoRoot "scripts\start-codex-with-console-guard.ps1"
+$canonicalLauncher = Join-Path $repoRoot "scripts\start-codex-with-windows-guard.ps1"
+$consoleCompatibilityLauncher = Join-Path $repoRoot "scripts\start-codex-with-console-guard.ps1"
 $legacyLauncher = Join-Path $repoRoot "scripts\start-codex-with-git-wrapper.ps1"
 $setupLauncher = Join-Path $repoRoot "scripts\setup-and-start.ps1"
 $defaultTerminalScript = Join-Path $repoRoot "scripts\configure-default-terminal.ps1"
@@ -12,7 +13,10 @@ if (-not (Test-Path -LiteralPath $helperScript)) {
     throw "Launcher package helper is missing: $helperScript"
 }
 if (-not (Test-Path -LiteralPath $canonicalLauncher)) {
-    throw "Canonical console-guard launcher is missing: $canonicalLauncher"
+    throw "Canonical Windows Guard launcher is missing: $canonicalLauncher"
+}
+if (-not (Test-Path -LiteralPath $consoleCompatibilityLauncher)) {
+    throw "Console-named compatibility launcher is missing: $consoleCompatibilityLauncher"
 }
 if (-not (Test-Path -LiteralPath $legacyLauncher)) {
     throw "Legacy Git-wrapper launcher is missing: $legacyLauncher"
@@ -43,10 +47,13 @@ function Get-ScriptParameterNames {
 }
 
 $canonicalParameters = @(Get-ScriptParameterNames -Path $canonicalLauncher)
+$consoleCompatibilityParameters = @(Get-ScriptParameterNames -Path $consoleCompatibilityLauncher)
 $legacyParameters = @(Get-ScriptParameterNames -Path $legacyLauncher)
-$parameterDifference = Compare-Object -ReferenceObject $canonicalParameters -DifferenceObject $legacyParameters
-if ($parameterDifference) {
-    throw "Canonical and legacy launchers do not expose the same parameters: $($parameterDifference | Out-String)"
+foreach ($compatibilityParameters in @($consoleCompatibilityParameters, $legacyParameters)) {
+    $parameterDifference = Compare-Object -ReferenceObject $canonicalParameters -DifferenceObject $compatibilityParameters
+    if ($parameterDifference) {
+        throw "Canonical and compatibility launchers do not expose the same parameters: $($parameterDifference | Out-String)"
+    }
 }
 if ($canonicalParameters -notcontains "UseWindowsConsoleHost") {
     throw "Canonical launcher is missing -UseWindowsConsoleHost."

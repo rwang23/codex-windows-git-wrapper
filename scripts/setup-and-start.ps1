@@ -14,7 +14,7 @@ $ErrorActionPreference = "Stop"
 $scriptsDir = Split-Path -Parent $PSCommandPath
 $installScript = Join-Path $scriptsDir "install.ps1"
 $statusScript = Join-Path $scriptsDir "status.ps1"
-$startScript = Join-Path $scriptsDir "start-codex-with-console-guard.ps1"
+$startScript = Join-Path $scriptsDir "start-codex-with-windows-guard.ps1"
 $packageScript = Join-Path $scriptsDir "codex-package.ps1"
 $defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
 $codexTempScript = Join-Path $scriptsDir "configure-codex-temp.ps1"
@@ -55,10 +55,10 @@ if ($RealPowerShell) {
     $installArgs += @("-RealPowerShell", $RealPowerShell)
 }
 
-Write-Output "Installing or refreshing Codex Windows Console Guard..."
+Write-Output "Installing or refreshing Codex Windows Guard..."
 & powershell -NoProfile @installArgs
 if ($LASTEXITCODE -ne 0) {
-    throw "Console Guard installation failed with exit code $LASTEXITCODE."
+    throw "Windows Guard installation failed with exit code $LASTEXITCODE."
 }
 
 if ($UseWindowsConsoleHost) {
@@ -88,7 +88,7 @@ Write-Output ""
 Write-Output "Checking wrapper status..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File $statusScript -InstallDir $InstallDir
 if ($LASTEXITCODE -ne 0) {
-    throw "Console Guard status check failed with exit code $LASTEXITCODE."
+    throw "Windows Guard status check failed with exit code $LASTEXITCODE."
 }
 
 $startArgs = @(

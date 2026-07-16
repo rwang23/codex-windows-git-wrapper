@@ -1,10 +1,10 @@
-# ChatGPT Codex Windows Console Guard
+# ChatGPT Codex Windows Guard
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
 Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop app who see `git.exe`, `powershell.exe`, `cmd.exe`, `conhost.exe`, or blank Windows Terminal windows flash while Codex is working.
 
-The canonical launcher is `scripts\start-codex-with-console-guard.ps1`. `scripts\start-codex-with-git-wrapper.ps1` remains a compatibility forwarder for existing setups.
+The canonical launcher is `scripts\start-codex-with-windows-guard.ps1`. The former console-named launcher and `scripts\start-codex-with-git-wrapper.ps1` remain compatibility forwarders for existing setups.
 
 The wrapper deliberately keeps Codex's `powershell.exe` compatibility path on the configured Windows PowerShell executable. It does not silently replace that executable with `pwsh.exe`; use a separate PowerShell 7 terminal for work that explicitly needs PowerShell 7.
 
@@ -17,7 +17,7 @@ Start here. Give an agent this instruction before asking it to read the rest of 
 ```text
 I am on Windows and ChatGPT Codex Desktop is flashing Git, PowerShell, CMD, conhost, or blank Terminal windows.
 
-Use https://github.com/rwang23/codex-windows-console-guard as a reversible, Windows-only compatibility workaround.
+Use https://github.com/rwang23/codex-windows-guard as a reversible, Windows-only compatibility workaround.
 
 Execution order:
 1. Clone to a user-chosen local folder. Do not assume an existing absolute path.
@@ -46,14 +46,14 @@ In the Windows setup used to validate this project, explicitly selecting **Windo
 Check the current mode first:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Status
 ```
 
 If the reported mode is `Automatic` or `Windows Terminal` and the symptom matches, apply the change from an external PowerShell window:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
 ```
 
@@ -100,7 +100,7 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 ## How it works
 
 1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory. They forward arguments, standard streams, and exit codes to the real executables without creating a console window.
-2. `scripts\start-codex-with-console-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
+2. `scripts\start-codex-with-windows-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
 3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it observes new top-level windows and uses a sparse startup/30-second rescan so process-ancestry races and persistent blank helper windows are not missed. A rescan reads the process graph only after it finds a visible candidate window, avoiding idle process-table polling.
 4. For systems where Windows Terminal delegation creates blank brokered windows, the explicit `-UseWindowsConsoleHost` switch selects the OS-supported legacy console host for unbound console launches. In the captured brokered-window symptom class, this avoids the Windows Terminal/OpenConsole delegation path without globally hiding `WindowsTerminal.exe`, which could also hide legitimate user terminals. The two GUID values follow Microsoft's documented [Default terminal application policy](https://learn.microsoft.com/windows/terminal/group-policy#default-terminal-application).
 5. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
@@ -121,8 +121,8 @@ The guard is intentionally an observation-and-hide fallback. It never turns the 
 Clone the repository anywhere you prefer, then run the installer. This example uses a generic directory under your user profile, not a machine-specific project path:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
-git clone https://github.com/rwang23/codex-windows-console-guard.git $repo
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
+git clone https://github.com/rwang23/codex-windows-guard.git $repo
 & (Join-Path $repo "scripts\install.ps1")
 ```
 
@@ -142,10 +142,10 @@ The installer records the real Git, PowerShell, and Command Prompt paths inside 
 
 ## Daily launch: one copy-paste command, no `cd`, no `git pull`
 
-After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and console guard; it does not pull the repository or rebuild anything.
+After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and Windows Guard; it does not pull the repository or rebuild anything.
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
 
 `-Force` closes a running ChatGPT/Codex desktop process before restarting it. Save your work first, and **never run this command from an active Codex task**, because it will terminate that task.
@@ -153,7 +153,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 If Codex is already closed, you can omit `-Force`:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
 ```
 
 ## Optional: dedicated Codex temporary directory
@@ -161,7 +161,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 Use this when the normal `%TEMP%` folder has accumulated many files and shell-based Codex operations feel slow. Put the directory on an SSD/NVMe volume; for example:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Enable -TempDir "C:\CodexTemp"
 ```
 
@@ -172,14 +172,14 @@ The one-shell snippet commonly shared for `codex -C ...` is useful for the stand
 You can configure the directory while starting from an external PowerShell window:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\setup-and-start.ps1") -TempDir "C:\CodexTemp" -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
 ```
 
 To stop using the dedicated directory without deleting its files:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
 ```
 
@@ -200,7 +200,7 @@ The optional switches address different symptoms. The console guard is for Codex
 Do not run `git pull` every time you launch Codex. Update only when you want a newer workaround version or need to repair the installed wrapper:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 git -C $repo pull --ff-only
 & (Join-Path $repo "scripts\setup-and-start.ps1") -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
 ```
@@ -208,7 +208,7 @@ git -C $repo pull --ff-only
 For a first-time clone-or-update from any directory, use:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-console-guard'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-console-guard.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-guard'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-guard.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
 ```
 
 Again, run a `-Force` command only from outside Codex.
@@ -218,7 +218,7 @@ Again, run a `-Force` command only from outside Codex.
 Status:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\status.ps1")
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\status.ps1")
 ```
 
 The status report includes the detected app package, wrapper install path, real Git path, current default-terminal mode, dedicated-wrapper TEMP status, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
@@ -228,7 +228,7 @@ The status report includes the detected app package, wrapper install path, real 
 Use the separate health snapshot when Codex feels slow or its stdio/MCP process count appears to grow:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\health-snapshot.ps1")
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\health-snapshot.ps1")
 ```
 
 For machine-readable output:
@@ -242,7 +242,7 @@ The snapshot groups service roots beneath each Codex `app-server`, aggregates th
 Rollback is simple. Close Codex, then run:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Restore
 & (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
 & (Join-Path $repo "scripts\remove.ps1")
@@ -252,7 +252,7 @@ Run the restore command only if `-UseWindowsConsoleHost` created a backup; other
 
 ## Troubleshooting
 
-### The console guard is missing
+### The native guard is missing
 
 `status.ps1` will report whether `codex-console-window-guard.exe` was built. If it is missing, install Visual Studio Build Tools/C++ (or another supported native compiler), then run `scripts\install.ps1` again. The standard process-local wrappers can still help when the guard is unavailable.
 
@@ -275,7 +275,7 @@ No matching log entry means the remaining window has a different owner/process g
 This is a different symptom class from a guard-log match: Automatic default-terminal delegation can broker the visible UI through `WindowsTerminal.exe` / `OpenConsole.exe`, beyond a safe Codex process-ancestry match. Run `status.ps1` and check **Default terminal application**. If the mode is `Automatic` or `Windows Terminal`, and the unwanted window is titled `Terminal` with class `CASCADIA_HOSTING_WINDOW_CLASS`, apply the reversible compatibility mode from an external PowerShell window:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode ConsoleHost
 ```
 
 This changes only the current user's default host for otherwise-unbound console processes. It does not uninstall or disable Windows Terminal, and manually opening Windows Terminal still works. Restore the original values with `-Mode Restore`.
@@ -303,7 +303,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\codex-temp-regressio
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\health-snapshot-regression.ps1
 ```
 
-The console-guard test simulates both `ChatGPT.exe` and legacy `Codex.exe` launching a Git console process, verifies diagnostic logging, and asserts process-graph rules for shell launchers, the packaged Codex backend, and the Chrome native-host bridge. It skips only when no native compiler is available.
+The native-guard test simulates both `ChatGPT.exe` and legacy `Codex.exe` launching a Git console process, verifies diagnostic logging, and asserts process-graph rules for shell launchers, the packaged Codex backend, and the Chrome native-host bridge. It skips only when no native compiler is available.
 
 Please report the desktop package version, the exact visible process/window symptom, and the redacted `status.ps1` output. Do not include personal paths, account data, or tokens.
 

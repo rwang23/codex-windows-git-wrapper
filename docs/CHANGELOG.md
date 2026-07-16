@@ -14,8 +14,8 @@ All notable changes to this project are documented here. Earlier history remains
 - Added an opt-in, wrapper-scoped temporary-directory configuration. It gives Codex-launched Git, Command Prompt, and PowerShell child processes a dedicated `TEMP`/`TMP` without changing the user's or system's global environment variables.
 - Added a reversible `-UseWindowsConsoleHost` compatibility mode for blank, focus-stealing Windows Terminal windows created when automatic terminal delegation brokers Codex console launches through `svchost.exe`.
 - Extended status diagnostics with the current default-terminal mode and corrected persistent `PATH` checks to compare the actual wrapper install directory.
-- Promoted `scripts\start-codex-with-console-guard.ps1` to the canonical launcher and retained `scripts\start-codex-with-git-wrapper.ps1` as a compatibility forwarder.
-- Renamed the public repository from `codex-windows-git-wrapper` to `codex-windows-console-guard` to describe its full targeted scope: Git, Command Prompt, PowerShell, conhost, and the process-aware console-window guard.
+- Renamed the public project to **Codex Windows Guard** and the repository to `codex-windows-guard`; the name now reflects the focused Windows compatibility scope without promising broad system optimization.
+- Promoted `scripts\start-codex-with-windows-guard.ps1` to the canonical launcher. Both the former console-named launcher and `scripts\start-codex-with-git-wrapper.ps1` remain compatibility forwarders.
 - Expanded the guard beyond `ConsoleWindowClass` so it can suppress the persistent blank-window variant owned by the packaged Codex backend or its known console helpers.
 - Added coverage for the Chrome-parented `cmd.exe` native-messaging bridge used by the bundled Codex Chrome plugin.
 - Added a sparse startup/30-second existing-window scan to recover from process-ancestry timing races without introducing continuous process-table polling.

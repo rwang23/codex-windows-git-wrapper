@@ -279,10 +279,10 @@ if ($nativeCompiler -and (Test-Path -LiteralPath $consoleWindowGuardSource)) {
     }
     Build-NativeWrapper -CompilerName $nativeCompiler.Name -CompilerPath $nativeCompiler.Path -EnvScript $nativeCompiler.EnvScript -Source $consoleWindowGuardSource -Output $consoleWindowGuardOutput -BuildDir (Join-Path $repoRoot "obj\console-window-guard")
     if (-not (Test-Path -LiteralPath $consoleWindowGuardOutput)) {
-        throw "Console window guard compilation failed."
+        throw "Native guard compilation failed."
     }
 } elseif (Test-Path -LiteralPath $consoleWindowGuardOutput) {
-    Write-Warning "Retaining the existing console window guard because no native C++ compiler is currently available to rebuild it."
+    Write-Warning "Retaining the existing native guard because no native C++ compiler is currently available to rebuild it."
 }
 
 Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolvedRealGit -Encoding ASCII
@@ -290,14 +290,14 @@ Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $r
 Set-Content -LiteralPath (Join-Path $InstallDir "real-cmd.txt") -Value $resolvedRealCmd -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
 
-Write-Output "Installed Codex Windows Console Guard."
+Write-Output "Installed Codex Windows Guard."
 Write-Output "Wrapper:  $output"
 Write-Output "PowerShell wrapper: $powerShellOutput"
 Write-Output "Command Prompt wrapper: $cmdOutput"
 if (Test-Path -LiteralPath $consoleWindowGuardOutput) {
-    Write-Output "Console window guard: $consoleWindowGuardOutput"
+    Write-Output "Windows Guard: $consoleWindowGuardOutput"
 } else {
-    Write-Warning "Console window guard was not built because no native C++ compiler was available."
+    Write-Warning "Native guard was not built because no native C++ compiler was available."
 }
 Write-Output "Build:    $buildKind"
 Write-Output "Real Git: $resolvedRealGit"
@@ -306,4 +306,4 @@ Write-Output "Real Command Prompt: $resolvedRealCmd"
 Write-Output "Version:  $gitVersion"
 Write-Output "PowerShell version: $powerShellVersion"
 Write-Output ""
-Write-Output "Next: close Codex, then run scripts\start-codex-with-console-guard.ps1"
+Write-Output "Next: close Codex, then run scripts\start-codex-with-windows-guard.ps1"

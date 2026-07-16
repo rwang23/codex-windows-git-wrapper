@@ -15,7 +15,7 @@
 ## Read First
 
 1. `README.md` for install, launch, rollback, and user-facing safety rules.
-2. `scripts\install.ps1`, `scripts\start-codex-with-console-guard.ps1`, `scripts\configure-default-terminal.ps1`, and `scripts\configure-codex-temp.ps1` before changing installation or launch behavior.
+2. `scripts\install.ps1`, `scripts\start-codex-with-windows-guard.ps1`, `scripts\configure-default-terminal.ps1`, and `scripts\configure-codex-temp.ps1` before changing installation or launch behavior.
 3. `scripts\codex-package.ps1` before changing package/process discovery.
 4. `src\CodexConsoleWindowGuard.cpp` and `tests\console-window-guard-regression.ps1` before changing window filtering.
 5. `scripts\health-snapshot.ps1` and `tests\health-snapshot-regression.ps1` before changing process-health diagnostics.
@@ -90,7 +90,7 @@ This project has no production service or customer data. Before a public GitHub 
 ## Tooling Map
 
 - `scripts\install.ps1`: builds/installs local wrappers and the optional guard.
-- `scripts\start-codex-with-console-guard.ps1`: canonical launcher for the process-local wrapper environment and console guard.
+- `scripts\start-codex-with-windows-guard.ps1`: canonical launcher for the process-local wrapper environment and console guard.
 - `scripts\start-codex-with-git-wrapper.ps1`: compatibility forwarder for older commands; new docs must use the canonical launcher.
 - `scripts\status.ps1`: read-only install/runtime diagnostics.
 - `scripts\health-snapshot.ps1`: read-only Codex app-server, stdio/MCP service-root, detached-candidate, memory, and BB Browser daemon diagnostics.
