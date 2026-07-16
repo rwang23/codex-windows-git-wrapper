@@ -12,7 +12,7 @@ $ErrorActionPreference = "Stop"
 $scriptsDir = Split-Path -Parent $PSCommandPath
 $installScript = Join-Path $scriptsDir "install.ps1"
 $statusScript = Join-Path $scriptsDir "status.ps1"
-$startScript = Join-Path $scriptsDir "start-codex-with-git-wrapper.ps1"
+$startScript = Join-Path $scriptsDir "start-codex-with-console-guard.ps1"
 $packageScript = Join-Path $scriptsDir "codex-package.ps1"
 
 foreach ($script in @($installScript, $statusScript, $startScript, $packageScript)) {
@@ -51,7 +51,7 @@ if ($RealPowerShell) {
     $installArgs += @("-RealPowerShell", $RealPowerShell)
 }
 
-Write-Output "Installing or refreshing Codex Git wrapper..."
+Write-Output "Installing or refreshing Codex Windows Console Guard..."
 & powershell -NoProfile @installArgs
 
 Write-Output ""

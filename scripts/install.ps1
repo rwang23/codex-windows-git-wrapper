@@ -290,7 +290,7 @@ Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $r
 Set-Content -LiteralPath (Join-Path $InstallDir "real-cmd.txt") -Value $resolvedRealCmd -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
 
-Write-Output "Installed Codex Git wrapper."
+Write-Output "Installed Codex Windows Console Guard."
 Write-Output "Wrapper:  $output"
 Write-Output "PowerShell wrapper: $powerShellOutput"
 Write-Output "Command Prompt wrapper: $cmdOutput"
@@ -306,4 +306,4 @@ Write-Output "Real Command Prompt: $resolvedRealCmd"
 Write-Output "Version:  $gitVersion"
 Write-Output "PowerShell version: $powerShellVersion"
 Write-Output ""
-Write-Output "Next: close Codex, then run scripts\start-codex-with-git-wrapper.ps1"
+Write-Output "Next: close Codex, then run scripts\start-codex-with-console-guard.ps1"

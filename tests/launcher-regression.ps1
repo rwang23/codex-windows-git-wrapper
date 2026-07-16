@@ -2,9 +2,17 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $helperScript = Join-Path $repoRoot "scripts\codex-package.ps1"
+$canonicalLauncher = Join-Path $repoRoot "scripts\start-codex-with-console-guard.ps1"
+$legacyLauncher = Join-Path $repoRoot "scripts\start-codex-with-git-wrapper.ps1"
 
 if (-not (Test-Path -LiteralPath $helperScript)) {
     throw "Launcher package helper is missing: $helperScript"
+}
+if (-not (Test-Path -LiteralPath $canonicalLauncher)) {
+    throw "Canonical console-guard launcher is missing: $canonicalLauncher"
+}
+if (-not (Test-Path -LiteralPath $legacyLauncher)) {
+    throw "Legacy Git-wrapper launcher is missing: $legacyLauncher"
 }
 
 . $helperScript

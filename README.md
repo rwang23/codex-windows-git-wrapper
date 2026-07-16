@@ -2,7 +2,7 @@
 
 Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop app who see `git.exe`, `powershell.exe`, `cmd.exe`, or `conhost.exe` windows flash while Codex is working.
 
-The repository name describes the complete console-window guard. The Git wrapper remains a targeted component, so existing script names intentionally stay stable.
+The canonical launcher is `scripts\start-codex-with-console-guard.ps1`. `scripts\start-codex-with-git-wrapper.ps1` remains a compatibility forwarder for existing setups.
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
 
@@ -43,7 +43,7 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 ## How it works
 
 1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory. They forward arguments, standard streams, and exit codes to the real executables without creating a console window.
-2. `scripts\start-codex-with-git-wrapper.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
+2. `scripts\start-codex-with-console-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
 3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it observes new top-level windows and uses a sparse startup/30-second rescan so process-ancestry races and persistent blank helper windows are not missed. A rescan reads the process graph only after it finds a visible candidate window, avoiding idle process-table polling.
 4. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
 5. The guard records each window it actually hides in `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin\codex-console-window-guard.log`. The log contains only a timestamp, PID, executable name, window class, and matching rule; it does not record command lines or window text.
@@ -86,7 +86,7 @@ The installer records the real Git, PowerShell, and Command Prompt paths inside 
 After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and console guard; it does not pull the repository or rebuild anything.
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
 ```
 
 `-Force` closes a running ChatGPT/Codex desktop process before restarting it. Save your work first, and **never run this command from an active Codex task**, because it will terminate that task.
@@ -94,7 +94,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 If Codex is already closed, you can omit `-Force`:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-git-wrapper.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
 ```
 
 ### Optional launch switches

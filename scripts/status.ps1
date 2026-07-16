@@ -112,7 +112,7 @@ if ($git) {
 }
 
 Write-Output ""
-Write-Output "Codex Git console window guard:"
+Write-Output "Codex Windows console guard:"
 if (Test-Path -LiteralPath $consoleWindowGuard -PathType Leaf) {
     $runningGuard = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
         Where-Object { try { $_.Path -eq $consoleWindowGuard } catch { $false } } |
