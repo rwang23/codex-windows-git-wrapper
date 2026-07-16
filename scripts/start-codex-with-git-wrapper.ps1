@@ -5,6 +5,7 @@ param(
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
     [switch]$UseWindowsConsoleHost,
+    [string]$TempDir,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin"),
     [string]$RealGit,
     [string]$RealPowerShell
@@ -28,6 +29,9 @@ if ($SuppressProcessSampling) {
 }
 if ($UseWindowsConsoleHost) {
     $forwardedArguments.UseWindowsConsoleHost = $true
+}
+if ($TempDir) {
+    $forwardedArguments.TempDir = $TempDir
 }
 if ($RealGit) {
     $forwardedArguments.RealGit = $RealGit

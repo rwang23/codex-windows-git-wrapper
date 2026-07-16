@@ -3,6 +3,7 @@ param(
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
     [switch]$UseWindowsConsoleHost,
+    [string]$TempDir,
     [string]$RealGit,
     [string]$RealPowerShell,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin")
@@ -16,8 +17,9 @@ $statusScript = Join-Path $scriptsDir "status.ps1"
 $startScript = Join-Path $scriptsDir "start-codex-with-console-guard.ps1"
 $packageScript = Join-Path $scriptsDir "codex-package.ps1"
 $defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
+$codexTempScript = Join-Path $scriptsDir "configure-codex-temp.ps1"
 
-foreach ($script in @($installScript, $statusScript, $startScript, $packageScript, $defaultTerminalScript)) {
+foreach ($script in @($installScript, $statusScript, $startScript, $packageScript, $defaultTerminalScript, $codexTempScript)) {
     if (-not (Test-Path -LiteralPath $script)) {
         throw "Required script not found: $script"
     }
@@ -70,6 +72,18 @@ if ($UseWindowsConsoleHost) {
     }
 }
 
+if ($TempDir) {
+    Write-Output ""
+    Write-Output "Configuring the Codex wrapper temporary directory..."
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $codexTempScript `
+        -Mode Enable `
+        -TempDir $TempDir `
+        -InstallDir $InstallDir
+    if ($LASTEXITCODE -ne 0) {
+        throw "Codex temporary-directory configuration failed with exit code $LASTEXITCODE."
+    }
+}
+
 Write-Output ""
 Write-Output "Checking wrapper status..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File $statusScript -InstallDir $InstallDir
@@ -98,6 +112,9 @@ if ($SuppressProcessSampling) {
 }
 if ($UseWindowsConsoleHost) {
     $startArgs += "-UseWindowsConsoleHost"
+}
+if ($TempDir) {
+    $startArgs += @("-TempDir", $TempDir)
 }
 
 if ($Force) {

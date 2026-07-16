@@ -6,6 +6,7 @@ All notable changes to this project are documented here. Earlier history remains
 
 ### Changed
 
+- Added an opt-in, wrapper-scoped temporary-directory configuration. It gives Codex-launched Git, Command Prompt, and PowerShell child processes a dedicated `TEMP`/`TMP` without changing the user's or system's global environment variables.
 - Added a reversible `-UseWindowsConsoleHost` compatibility mode for blank, focus-stealing Windows Terminal windows created when automatic terminal delegation brokers Codex console launches through `svchost.exe`.
 - Extended status diagnostics with the current default-terminal mode and corrected persistent `PATH` checks to compare the actual wrapper install directory.
 - Promoted `scripts\start-codex-with-console-guard.ps1` to the canonical launcher and retained `scripts\start-codex-with-git-wrapper.ps1` as a compatibility forwarder.
@@ -17,6 +18,7 @@ All notable changes to this project are documented here. Earlier history remains
 
 ### Added
 
+- `scripts\configure-codex-temp.ps1`, launcher `-TempDir` support, status visibility, and regression coverage for TEMP/TMP inheritance plus configuration rollback.
 - An isolated registry regression test plus `scripts\configure-default-terminal.ps1`, which backs up and restores only the two current-user terminal delegation values.
 - A bounded diagnostic log containing only matched PID, executable, window class, and rule information.
 - Status output and regression coverage for the diagnostic log and the new process-graph rules.

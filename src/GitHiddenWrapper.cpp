@@ -40,6 +40,11 @@ static bool FileExists(const std::wstring& path) {
     return attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY);
 }
 
+static bool DirectoryExists(const std::wstring& path) {
+    DWORD attributes = GetFileAttributesW(path.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY);
+}
+
 static std::wstring Trim(const std::wstring& value) {
     const wchar_t* whitespace = L" \t\r\n";
     size_t first = value.find_first_not_of(whitespace);
@@ -99,6 +104,33 @@ static std::wstring GetEnvironmentString(const wchar_t* name) {
     }
     value.resize(copied);
     return Trim(value);
+}
+
+static std::wstring ResolveConfiguredTempDirectory() {
+    std::wstring fromEnvironment = GetEnvironmentString(L"CODEX_TEMP_DIR");
+    if (!fromEnvironment.empty() && DirectoryExists(fromEnvironment)) {
+        return fromEnvironment;
+    }
+
+    std::wstring exeDir = GetExeDirectory();
+    if (!exeDir.empty()) {
+        std::wstring configured = ReadTextFile(exeDir + L"\\codex-temp-dir.txt");
+        if (!configured.empty() && DirectoryExists(configured)) {
+            return configured;
+        }
+    }
+
+    return L"";
+}
+
+static void ApplyConfiguredTempDirectory() {
+    std::wstring configured = ResolveConfiguredTempDirectory();
+    if (configured.empty()) {
+        return;
+    }
+
+    SetEnvironmentVariableW(L"TEMP", configured.c_str());
+    SetEnvironmentVariableW(L"TMP", configured.c_str());
 }
 
 struct TargetConfig {
@@ -261,6 +293,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
         WriteStderr(L"Real " + target.displayName + L" executable was not found. Reinstall the wrapper.");
         return 1;
     }
+
+    ApplyConfiguredTempDirectory();
 
     std::wstring fullCommandLine = QuoteArg(realExecutable);
     if (commandLine != nullptr && commandLine[0] != L'\0') {

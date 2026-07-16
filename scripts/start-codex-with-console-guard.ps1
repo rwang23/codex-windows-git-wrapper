@@ -3,6 +3,7 @@ param(
     [switch]$DisableShellSnapshot,
     [switch]$SuppressProcessSampling,
     [switch]$UseWindowsConsoleHost,
+    [string]$TempDir,
     [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin"),
     [string]$RealGit,
     [string]$RealPowerShell
@@ -12,6 +13,7 @@ $ErrorActionPreference = "Stop"
 $scriptsDir = Split-Path -Parent $PSCommandPath
 . (Join-Path $scriptsDir "codex-package.ps1")
 $defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
+$codexTempScript = Join-Path $scriptsDir "configure-codex-temp.ps1"
 
 if ($UseWindowsConsoleHost) {
     if (-not (Test-Path -LiteralPath $defaultTerminalScript -PathType Leaf)) {
@@ -20,6 +22,13 @@ if ($UseWindowsConsoleHost) {
     & $defaultTerminalScript `
         -Mode ConsoleHost `
         -BackupPath (Join-Path $InstallDir "default-terminal-backup.json")
+}
+
+if ($TempDir) {
+    if (-not (Test-Path -LiteralPath $codexTempScript -PathType Leaf)) {
+        throw "Codex temporary-directory configuration script is missing: $codexTempScript"
+    }
+    & $codexTempScript -Mode Enable -TempDir $TempDir -InstallDir $InstallDir
 }
 
 function Resolve-ConfiguredRealGit {
@@ -145,6 +154,19 @@ if ($Force) {
 
 $env:CODEX_REAL_GIT = $realGitPath
 $env:CODEX_REAL_POWERSHELL = $realPowerShellPath
+$configuredTempPath = Join-Path $InstallDir "codex-temp-dir.txt"
+$configuredTempDir = $null
+if (Test-Path -LiteralPath $configuredTempPath -PathType Leaf) {
+    $candidateTempDir = (Get-Content -LiteralPath $configuredTempPath -Raw).Trim()
+    if ($candidateTempDir -and (Test-Path -LiteralPath $candidateTempDir -PathType Container)) {
+        $configuredTempDir = (Get-Item -LiteralPath $candidateTempDir -Force).FullName
+        $env:CODEX_TEMP_DIR = $configuredTempDir
+        $env:TEMP = $configuredTempDir
+        $env:TMP = $configuredTempDir
+    } else {
+        Write-Warning "Configured Codex temporary directory is missing or invalid: $candidateTempDir"
+    }
+}
 if ($SuppressProcessSampling) {
     $env:CODEX_WRAPPER_SUPPRESS_PROCESS_SAMPLING = "1"
 } else {
@@ -187,6 +209,9 @@ Write-Output "Console window guard: $consoleWindowGuard"
 Write-Output "Console guard log: $consoleWindowGuardLog"
 Write-Output "RealGit: $realGitPath"
 Write-Output "RealPowerShell: $realPowerShellPath"
+if ($configuredTempDir) {
+    Write-Output "CodexTemp: $configuredTempDir"
+}
 if ($DisableShellSnapshot) {
     Write-Output "Feature: shell_snapshot disabled"
 }
@@ -206,5 +231,5 @@ catch {
     Write-Warning "Direct MSIX launch was denied: $($_.Exception.Message)"
     Write-Warning "Falling back to the registered Windows AppX launch entry."
     Start-Process -FilePath "explorer.exe" -ArgumentList "shell:AppsFolder\$appUserModelId"
-    Write-Warning "The AppX fallback may not inherit the process-local wrapper PATH."
+    Write-Warning "The AppX fallback may not inherit the process-local wrapper PATH or TEMP/TMP values."
 }

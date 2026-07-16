@@ -17,6 +17,7 @@ $consoleWindowGuard = Join-Path $InstallDir "codex-console-window-guard.exe"
 $consoleWindowGuardLog = Join-Path $InstallDir "codex-console-window-guard.log"
 $defaultTerminalScript = Join-Path $scriptsDir "configure-default-terminal.ps1"
 $defaultTerminalBackup = Join-Path $InstallDir "default-terminal-backup.json"
+$codexTempScript = Join-Path $scriptsDir "configure-codex-temp.ps1"
 $packageInfo = Resolve-CodexDesktopPackage
 $package = $packageInfo.Package
 
@@ -119,6 +120,14 @@ if (Test-Path -LiteralPath $defaultTerminalScript -PathType Leaf) {
     & $defaultTerminalScript -Mode Status -BackupPath $defaultTerminalBackup
 } else {
     Write-Output "  Configuration helper missing: $defaultTerminalScript"
+}
+
+Write-Output ""
+Write-Output "Codex wrapper temporary directory:"
+if (Test-Path -LiteralPath $codexTempScript -PathType Leaf) {
+    & $codexTempScript -Mode Status -InstallDir $InstallDir
+} else {
+    Write-Output "  Configuration helper missing: $codexTempScript"
 }
 
 Write-Output ""

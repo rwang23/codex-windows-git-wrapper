@@ -2,6 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $installScript = Join-Path $repoRoot "scripts\install.ps1"
+$tempConfigScript = Join-Path $repoRoot "scripts\configure-codex-temp.ps1"
 $guardTestRoot = Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin\guard-tests"
 $testInstall = Join-Path $guardTestRoot "codex-wrapper-install-test-$PID"
 $realGit = (Get-Command git.exe -All -CommandType Application | Where-Object {
@@ -31,6 +32,10 @@ function Invoke-Wrapper {
 
 try {
     & $installScript -InstallDir $testInstall -RealPowerShell $realPowerShell
+
+    if (-not (Test-Path -LiteralPath $tempConfigScript -PathType Leaf)) {
+        throw "Codex temporary-directory configuration script is missing: $tempConfigScript"
+    }
 
     $gitWrapper = Join-Path $testInstall "git.exe"
     $powerShellWrapper = Join-Path $testInstall "powershell.exe"
@@ -73,6 +78,16 @@ try {
     $powerShellResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", "Write-Output 'wrapper-powershell-ok'")
     if ($powerShellResult.ExitCode -ne 0 -or $powerShellResult.Stdout -ne "wrapper-powershell-ok") {
         throw "PowerShell wrapper did not forward correctly: $($powerShellResult.Stdout) $($powerShellResult.Stderr)"
+    }
+
+    $codexTemp = Join-Path $testInstall "codex-temp"
+    & $tempConfigScript -Mode Enable -TempDir $codexTemp -InstallDir $testInstall
+    $tempProbeCommand = '$env:TEMP + "|" + $env:TMP'
+    $encodedTempProbe = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($tempProbeCommand))
+    $tempProbeResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $encodedTempProbe)
+    $expectedTempProbe = "$codexTemp|$codexTemp"
+    if ($tempProbeResult.ExitCode -ne 0 -or $tempProbeResult.Stdout -ne $expectedTempProbe) {
+        throw "PowerShell wrapper did not inherit the configured Codex TEMP/TMP: $($tempProbeResult.Stdout) $($tempProbeResult.Stderr)"
     }
 
     $cmdResult = Invoke-Wrapper -FilePath $cmdWrapper -ArgumentList @("/d", "/s", "/c", "echo wrapper-cmd-ok")

@@ -4,6 +4,8 @@ Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop 
 
 The canonical launcher is `scripts\start-codex-with-console-guard.ps1`. `scripts\start-codex-with-git-wrapper.ps1` remains a compatibility forwarder for existing setups.
 
+The wrapper deliberately keeps Codex's `powershell.exe` compatibility path on the configured Windows PowerShell executable. It does not silently replace that executable with `pwsh.exe`; use a separate PowerShell 7 terminal for work that explicitly needs PowerShell 7.
+
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
 
 ## What problem does it address?
@@ -52,6 +54,7 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 4. For systems where Windows Terminal delegation creates blank brokered windows, the explicit `-UseWindowsConsoleHost` switch selects the OS-supported legacy console host for unbound console launches. This avoids globally hiding `WindowsTerminal.exe`, which could also hide legitimate user terminals. The two GUID values follow Microsoft's documented [Default terminal application policy](https://learn.microsoft.com/windows/terminal/group-policy#default-terminal-application).
 5. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
 6. The guard records each window it actually hides in `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin\codex-console-window-guard.log`. The log contains only a timestamp, PID, executable name, window class, and matching rule; it does not record command lines or window text.
+7. The optional Codex temporary-directory configuration is stored in the wrapper installation directory. Each wrapper child reads it and sets its own `TEMP` and `TMP`; it does not change the user-level or machine-level environment variables.
 
 The guard is intentionally an observation-and-hide fallback. It never turns the real Git executable into a GUI executable, because that would make ordinary PowerShell Git commands behave asynchronously.
 
@@ -102,6 +105,33 @@ If Codex is already closed, you can omit `-Force`:
 $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\start-codex-with-console-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
 ```
 
+## Optional: dedicated Codex temporary directory
+
+Use this when the normal `%TEMP%` folder has accumulated many files and shell-based Codex operations feel slow. Put the directory on an SSD/NVMe volume; for example:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+& (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Enable -TempDir "C:\CodexTemp"
+```
+
+This creates the directory if needed and makes only Codex wrapper children (`git.exe`, `powershell.exe`, and `cmd.exe`) use it. It leaves the Windows user/system `TEMP` and `TMP` values unchanged. New wrapper children read the setting immediately; after a wrapper refresh and Codex relaunch, the launcher also offers that directory to any direct launch path that inherits its process environment.
+
+The one-shell snippet commonly shared for `codex -C ...` is useful for the standalone CLI, but it affects only that CLI process tree. Microsoft Store / MSIX desktop activation can bypass a parent shell's process-local environment, so this project keeps the setting beside the wrappers instead of claiming a global desktop-app override.
+
+You can configure the directory while starting from an external PowerShell window:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+& (Join-Path $repo "scripts\setup-and-start.ps1") -TempDir "C:\CodexTemp" -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
+```
+
+To stop using the dedicated directory without deleting its files:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
+& (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
+```
+
 ### Optional launch switches
 
 | Switch | When to use it | Trade-off |
@@ -110,6 +140,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 | `-DisableShellSnapshot` | Codex is repeatedly starting PowerShell/conhost for shell/process snapshots. Requires the `codex` CLI to be available. | Disables the background `shell_snapshot` feature in Codex user configuration. |
 | `-SuppressProcessSampling` | Desktop process sampling is creating high CPU or repeated PowerShell/CIM activity. | Process CPU/metadata views in the desktop app can be incomplete while enabled. |
 | `-UseWindowsConsoleHost` | Blank Windows Terminal windows titled `Terminal` appear or steal focus. | Changes the current user's default terminal host for otherwise-unbound console apps; Windows Terminal can still be opened normally. Original values are backed up. |
+| `-TempDir "C:\CodexTemp"` | The normal TEMP directory is crowded and wrapper-launched commands are slow. | Creates/uses a dedicated temp directory only for Codex wrapper children; does not globally move Windows TEMP/TMP. |
 
 The optional switches address different symptoms. The console guard is for Codex-launched Git, Command Prompt, and PowerShell console flashes; the snapshot and sampling switches are for separate PowerShell/process-telemetry activity.
 
@@ -139,7 +170,7 @@ Status:
 $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $repo "scripts\status.ps1")
 ```
 
-The status report includes the detected app package, wrapper install path, real Git path, current default-terminal mode, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
+The status report includes the detected app package, wrapper install path, real Git path, current default-terminal mode, dedicated-wrapper TEMP status, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
 
 ### Read-only process health snapshot
 
@@ -162,6 +193,7 @@ Rollback is simple. Close Codex, then run:
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"
 & (Join-Path $repo "scripts\configure-default-terminal.ps1") -Mode Restore
+& (Join-Path $repo "scripts\configure-codex-temp.ps1") -Mode Disable
 & (Join-Path $repo "scripts\remove.ps1")
 ```
 
@@ -197,6 +229,10 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-console-guard"; & (Join-Path $
 
 This changes only the current user's default host for otherwise-unbound console processes. It does not uninstall or disable Windows Terminal, and manually opening Windows Terminal still works. Restore the original values with `-Mode Restore`.
 
+### A large TEMP directory makes shell commands feel slow
+
+Run `status.ps1` and check **Codex wrapper temporary directory**. If it is disabled, enable an SSD-backed path such as `C:\CodexTemp` with `configure-codex-temp.ps1`. The setting affects new child processes launched through the wrappers; it does not make the desktop app's own MSIX activation inherit a temporary directory when Windows starts it through an AppX broker.
+
 If the issue started after a Codex desktop update, capture the app package version and `status.ps1` output (with any private paths removed) and open or update an upstream issue. The project will keep tracking Windows package behavior, but it cannot replace a native upstream process-launch fix.
 
 ### `fondue.exe` or a Windows Features dialog appears
@@ -216,7 +252,8 @@ Requirements:
 - Treat this as a Windows-only, cross-version (ChatGPT.exe and Codex.exe) compatibility tool.
 - Clone the repository to a user-chosen local folder; do not assume an existing absolute path.
 - Do not replace, rename, patch, or manually copy my real Git executable.
-- Do not modify system PATH or user PATH. Modify the two per-user default-terminal registry values only when I explicitly approve `-UseWindowsConsoleHost`; preserve the generated backup.
+- Do not modify system PATH, user PATH, user TEMP/TMP, or machine TEMP/TMP. Modify the two per-user default-terminal registry values only when I explicitly approve `-UseWindowsConsoleHost`; preserve the generated backup.
+- A dedicated temporary directory must be wrapper-scoped, reversible, and leave its files in place on disable.
 - Run scripts\install.ps1 first and then scripts\status.ps1.
 - If Git detection fails, use Get-Command git -All and pass -RealGit with the real Git path.
 - Use scripts\setup-and-start.ps1 only when I explicitly approve a Codex restart.
@@ -235,6 +272,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\install-regression.p
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\launcher-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\console-window-guard-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\default-terminal-regression.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\codex-temp-regression.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\health-snapshot-regression.ps1
 ```
 

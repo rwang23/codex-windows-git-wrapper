@@ -6,6 +6,7 @@ $canonicalLauncher = Join-Path $repoRoot "scripts\start-codex-with-console-guard
 $legacyLauncher = Join-Path $repoRoot "scripts\start-codex-with-git-wrapper.ps1"
 $setupLauncher = Join-Path $repoRoot "scripts\setup-and-start.ps1"
 $defaultTerminalScript = Join-Path $repoRoot "scripts\configure-default-terminal.ps1"
+$codexTempScript = Join-Path $repoRoot "scripts\configure-codex-temp.ps1"
 
 if (-not (Test-Path -LiteralPath $helperScript)) {
     throw "Launcher package helper is missing: $helperScript"
@@ -21,6 +22,9 @@ if (-not (Test-Path -LiteralPath $setupLauncher)) {
 }
 if (-not (Test-Path -LiteralPath $defaultTerminalScript)) {
     throw "Default-terminal configuration helper is missing: $defaultTerminalScript"
+}
+if (-not (Test-Path -LiteralPath $codexTempScript)) {
+    throw "Codex temporary-directory configuration helper is missing: $codexTempScript"
 }
 
 function Get-ScriptParameterNames {
@@ -47,9 +51,15 @@ if ($parameterDifference) {
 if ($canonicalParameters -notcontains "UseWindowsConsoleHost") {
     throw "Canonical launcher is missing -UseWindowsConsoleHost."
 }
+if ($canonicalParameters -notcontains "TempDir") {
+    throw "Canonical launcher is missing -TempDir."
+}
 $setupParameters = @(Get-ScriptParameterNames -Path $setupLauncher)
 if ($setupParameters -notcontains "UseWindowsConsoleHost") {
     throw "Setup launcher is missing -UseWindowsConsoleHost."
+}
+if ($setupParameters -notcontains "TempDir") {
+    throw "Setup launcher is missing -TempDir."
 }
 
 . $helperScript
