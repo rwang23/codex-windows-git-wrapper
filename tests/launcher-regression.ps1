@@ -68,6 +68,10 @@ if ($setupParameters -notcontains "UseWindowsConsoleHost") {
 if ($setupParameters -notcontains "TempDir") {
     throw "Setup launcher is missing -TempDir."
 }
+$setupContent = [IO.File]::ReadAllText($setupLauncher)
+if ($setupContent -notmatch '(?s)if\s*\(\$Force\)\s*\{\s*\$installArgs\s*\+=\s*"-StopWrapperProcesses"\s*\}') {
+    throw "Setup launcher does not forward -Force to the scoped wrapper-process cleanup."
+}
 
 . $helperScript
 

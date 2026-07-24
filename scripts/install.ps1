@@ -1,10 +1,65 @@
 param(
     [string]$RealGit,
     [string]$RealPowerShell,
-    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin")
+    [string]$InstallDir = (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\wrapper-bin"),
+    [switch]$StopWrapperProcesses
 )
 
 $ErrorActionPreference = "Stop"
+
+function Get-RunningWrapperProcesses {
+    param([string]$WrapperInstallDir)
+
+    $resolvedInstallDir = [IO.Path]::GetFullPath($WrapperInstallDir)
+    $wrapperPaths = @(
+        "git.exe",
+        "powershell.exe",
+        "cmd.exe",
+        "codex-console-window-guard.exe"
+    ) | ForEach-Object { Join-Path $resolvedInstallDir $_ }
+
+    return @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            $_.Path -and $wrapperPaths -contains $_.Path
+        }
+        catch {
+            $false
+        }
+    })
+}
+
+function Stop-RunningWrapperProcesses {
+    param([string]$WrapperInstallDir)
+
+    $running = @(Get-RunningWrapperProcesses -WrapperInstallDir $WrapperInstallDir)
+    if (-not $running) {
+        return
+    }
+
+    Write-Output "Stopping $($running.Count) Codex Windows Guard wrapper process(es) before refresh..."
+    foreach ($process in $running) {
+        try {
+            Stop-Process -Id $process.Id -Force -ErrorAction Stop
+        }
+        catch {
+            $stillRunning = @(Get-RunningWrapperProcesses -WrapperInstallDir $WrapperInstallDir | Where-Object { $_.Id -eq $process.Id })
+            if ($stillRunning) {
+                throw
+            }
+        }
+    }
+
+    $deadline = (Get-Date).AddSeconds(5)
+    do {
+        Start-Sleep -Milliseconds 100
+        $remaining = @(Get-RunningWrapperProcesses -WrapperInstallDir $WrapperInstallDir)
+    } while ($remaining -and (Get-Date) -lt $deadline)
+
+    if ($remaining) {
+        $processIds = $remaining.Id -join ", "
+        throw "Codex Windows Guard wrapper process(es) are still running after the forced refresh: $processIds"
+    }
+}
 
 function Find-Csc {
     $candidates = @(
@@ -245,6 +300,9 @@ $gitVersion = & $resolvedRealGit --version
 $powerShellVersion = & $resolvedRealPowerShell -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()'
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+if ($StopWrapperProcesses) {
+    Stop-RunningWrapperProcesses -WrapperInstallDir $InstallDir
+}
 $output = Join-Path $InstallDir "git.exe"
 $buildKind = "managed-csharp"
 $nativeCompiler = $null

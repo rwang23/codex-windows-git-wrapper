@@ -54,6 +54,9 @@ if ($RealGit) {
 if ($RealPowerShell) {
     $installArgs += @("-RealPowerShell", $RealPowerShell)
 }
+if ($Force) {
+    $installArgs += "-StopWrapperProcesses"
+}
 
 Write-Output "Installing or refreshing Codex Windows Guard..."
 & powershell -NoProfile @installArgs

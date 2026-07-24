@@ -80,6 +80,54 @@ try {
         throw "PowerShell wrapper did not forward correctly: $($powerShellResult.Stdout) $($powerShellResult.Stderr)"
     }
 
+    $sleepCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("Start-Sleep -Seconds 30"))
+    $wrapperLockProcess = Start-Process -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $sleepCommand) -PassThru
+    $unrelatedPowerShellProcess = Start-Process -FilePath $realPowerShell -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $sleepCommand) -PassThru
+    try {
+        $deadline = (Get-Date).AddSeconds(5)
+        do {
+            $runningWrapper = Get-Process -Id $wrapperLockProcess.Id -ErrorAction SilentlyContinue
+            $wrapperIsLocked = $false
+            if ($runningWrapper) {
+                try {
+                    $wrapperIsLocked = $runningWrapper.Path -eq $powerShellWrapper
+                }
+                catch {
+                    $wrapperIsLocked = $false
+                }
+            }
+            if ($wrapperIsLocked) {
+                break
+            }
+            Start-Sleep -Milliseconds 100
+        } while ((Get-Date) -lt $deadline)
+
+        if (-not $wrapperIsLocked) {
+            throw "Test wrapper PowerShell process did not remain running at the expected path."
+        }
+
+        & $installScript -InstallDir $testInstall -RealGit $realGit -RealPowerShell $realPowerShell -StopWrapperProcesses
+
+        if (Get-Process -Id $wrapperLockProcess.Id -ErrorAction SilentlyContinue) {
+            throw "Forced wrapper refresh did not stop the locked wrapper process."
+        }
+        if (-not (Get-Process -Id $unrelatedPowerShellProcess.Id -ErrorAction SilentlyContinue)) {
+            throw "Forced wrapper refresh stopped an unrelated PowerShell process."
+        }
+
+        $refreshedPowerShellResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", "Write-Output 'wrapper-refresh-ok'")
+        if ($refreshedPowerShellResult.ExitCode -ne 0 -or $refreshedPowerShellResult.Stdout -ne "wrapper-refresh-ok") {
+            throw "PowerShell wrapper did not work after the forced refresh: $($refreshedPowerShellResult.Stdout) $($refreshedPowerShellResult.Stderr)"
+        }
+    }
+    finally {
+        foreach ($process in @($wrapperLockProcess, $unrelatedPowerShellProcess)) {
+            if ($process -and (Get-Process -Id $process.Id -ErrorAction SilentlyContinue)) {
+                Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+
     $codexTemp = Join-Path $testInstall "codex-temp"
     & $tempConfigScript -Mode Enable -TempDir $codexTemp -InstallDir $testInstall
     $tempProbeCommand = '$env:TEMP + "|" + $env:TMP'
