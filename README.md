@@ -6,7 +6,7 @@ Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop 
 
 The canonical launcher is `scripts\start-codex-with-windows-guard.ps1`. The former console-named launcher and `scripts\start-codex-with-git-wrapper.ps1` remain compatibility forwarders for existing setups.
 
-The wrapper deliberately keeps Codex's `powershell.exe` compatibility path on the configured Windows PowerShell executable. It does not silently replace that executable with `pwsh.exe`; use a separate PowerShell 7 terminal for work that explicitly needs PowerShell 7.
+The wrapper keeps its scope inside Codex's process tree. When PowerShell 7 (`pwsh.exe`) is available, it is the default target for Codex-launched `powershell.exe` commands; Windows PowerShell 5.1 remains installed and unchanged. Pass `-RealPowerShell` with the Windows PowerShell path when a legacy task needs to pin that edition.
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
 
@@ -90,7 +90,7 @@ Related upstream discussion:
 | Operating system | Windows only |
 | Desktop package names | Current `ChatGPT.exe` and legacy `Codex.exe` MSIX packages |
 | Git | Git for Windows; the installer prefers the direct `mingw64\bin\git.exe` executable when available |
-| PowerShell | Windows PowerShell wrapper for Codex-launched commands; PowerShell 5.1 or newer to run the scripts |
+| PowerShell | Codex-only wrapper that prefers installed PowerShell 7, falls back to Windows PowerShell 5.1, and preserves an explicit `-RealPowerShell` override |
 | Native compiler | Optional, but needed to build the console-window guard. The process-local wrappers still work without it. |
 
 This project deliberately does **not**:

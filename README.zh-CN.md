@@ -4,7 +4,7 @@
 
 这是一个仅适用于 **Windows** 的、可逆的本地兼容工具，用于缓解 ChatGPT Codex Desktop 工作时闪现的 `git.exe`、`powershell.exe`、`cmd.exe`、`conhost.exe`，以及空白的 Windows Terminal 窗口。
 
-它支持当前 Microsoft Store / MSIX 包中的 `ChatGPT.exe`，也兼容旧版 `Codex.exe`。它不是 macOS/Linux 工具，也不会替换真实 Git。
+它支持当前 Microsoft Store / MSIX 包中的 `ChatGPT.exe`，也兼容旧版 `Codex.exe`。它不是 macOS/Linux 工具，也不会替换真实 Git。若已安装 PowerShell 7，wrapper 只会在 Codex 启动的 `powershell.exe` 命令中优先转发到 `pwsh.exe`；系统 Windows PowerShell 5.1 保持不变。需要兼容旧脚本时，可通过 `-RealPowerShell` 显式固定到 5.1。
 
 ## 搜索关键词
 

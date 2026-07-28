@@ -13,7 +13,43 @@ $realGit = (Get-Command git.exe -All -CommandType Application | Where-Object {
 if (-not $realGit) {
     throw "No non-Codex Git installation was available for the install regression test."
 }
-$realPowerShell = (Get-Command powershell.exe -All -CommandType Application | Where-Object Source -NotLike "*codex-git-wrapper*" | Select-Object -First 1).Source
+$windowsPowerShell = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
+if (-not (Test-Path -LiteralPath $windowsPowerShell -PathType Leaf)) {
+    throw "Windows PowerShell was not available for the explicit override test."
+}
+
+function Get-PowerShellEdition {
+    param([string]$FilePath)
+
+    $edition = @(& $FilePath -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSEdition' 2>$null) |
+        Select-Object -Last 1
+    if ($LASTEXITCODE -ne 0 -or -not $edition) {
+        return $null
+    }
+    return $edition.Trim()
+}
+
+$realPowerShell7 = $null
+$powerShell7Candidates = @(
+    (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\pwsh.exe")
+) + @(
+    Get-Command pwsh.exe -All -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty Source
+)
+foreach ($candidate in ($powerShell7Candidates | Select-Object -Unique)) {
+    if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and
+        (Get-PowerShellEdition -FilePath $candidate) -eq "Core") {
+        $realPowerShell7 = (Resolve-Path -LiteralPath $candidate).Path
+        break
+    }
+}
+$expectedDefaultPowerShell = if ($realPowerShell7) { $realPowerShell7 } else { $windowsPowerShell }
+$expectedDefaultEdition = if ($realPowerShell7) { "Core" } else { "Desktop" }
+$guardEnvironmentNames = @("CODEX_REAL_GIT", "CODEX_REAL_POWERSHELL", "CODEX_REAL_CMD", "CODEX_TEMP_DIR")
+$inheritedGuardEnvironment = @{}
+foreach ($name in $guardEnvironmentNames) {
+    $inheritedGuardEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, [EnvironmentVariableTarget]::Process)
+}
 
 function Invoke-Wrapper {
     param([string]$FilePath, [string[]]$ArgumentList)
@@ -31,7 +67,11 @@ function Invoke-Wrapper {
 }
 
 try {
-    & $installScript -InstallDir $testInstall -RealPowerShell $realPowerShell
+    foreach ($name in $guardEnvironmentNames) {
+        Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+    }
+
+    & $installScript -InstallDir $testInstall
 
     if (-not (Test-Path -LiteralPath $tempConfigScript -PathType Leaf)) {
         throw "Codex temporary-directory configuration script is missing: $tempConfigScript"
@@ -70,6 +110,11 @@ try {
         throw "Installer selected Codex's private runtime Git instead of the user's Git installation: $configuredGit"
     }
 
+    $configuredDefaultPowerShell = (Get-Content -LiteralPath (Join-Path $testInstall 'real-powershell.txt') -Raw).Trim()
+    if ($configuredDefaultPowerShell -ne $expectedDefaultPowerShell) {
+        throw "Installer did not select the expected default PowerShell. Expected: $expectedDefaultPowerShell; Actual: $configuredDefaultPowerShell"
+    }
+
     $gitResult = Invoke-Wrapper -FilePath $gitWrapper -ArgumentList @("--version")
     if ($gitResult.ExitCode -ne 0 -or $gitResult.Stdout -notmatch '^git version ') {
         throw "Git wrapper did not forward correctly: $($gitResult.Stdout) $($gitResult.Stderr)"
@@ -80,9 +125,57 @@ try {
         throw "PowerShell wrapper did not forward correctly: $($powerShellResult.Stdout) $($powerShellResult.Stderr)"
     }
 
+    $defaultEditionResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", '$PSVersionTable.PSEdition')
+    if ($defaultEditionResult.ExitCode -ne 0 -or $defaultEditionResult.Stdout -ne $expectedDefaultEdition) {
+        throw "PowerShell wrapper did not use the expected default edition: $($defaultEditionResult.Stdout) $($defaultEditionResult.Stderr)"
+    }
+
+    & $installScript -InstallDir $testInstall -RealPowerShell $windowsPowerShell
+    $configuredOverridePowerShell = (Get-Content -LiteralPath (Join-Path $testInstall 'real-powershell.txt') -Raw).Trim()
+    if ($configuredOverridePowerShell -ne $windowsPowerShell) {
+        throw "Installer did not preserve the explicit Windows PowerShell override. Expected: $windowsPowerShell; Actual: $configuredOverridePowerShell"
+    }
+    $overrideEditionResult = Invoke-Wrapper -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", '$PSVersionTable.PSEdition')
+    if ($overrideEditionResult.ExitCode -ne 0 -or $overrideEditionResult.Stdout -ne "Desktop") {
+        throw "PowerShell wrapper did not honor the explicit Windows PowerShell override: $($overrideEditionResult.Stdout) $($overrideEditionResult.Stderr)"
+    }
+
+    $managedCsc = @(
+        (Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"),
+        (Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe")
+    ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    if ($managedCsc) {
+        $managedWrapperDir = Join-Path $testInstall "managed-wrapper"
+        $managedPowerShellWrapper = Join-Path $managedWrapperDir "powershell.exe"
+        $managedPowerShellConfig = Join-Path $managedWrapperDir "real-powershell.txt"
+        New-Item -ItemType Directory -Force -Path $managedWrapperDir | Out-Null
+        & $managedCsc /nologo /target:winexe "/out:$managedPowerShellWrapper" (Join-Path $repoRoot "src\GitHiddenWrapper.cs")
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $managedPowerShellWrapper -PathType Leaf)) {
+            throw "Managed C# wrapper compilation failed."
+        }
+
+        Set-Content -LiteralPath $managedPowerShellConfig -Value $expectedDefaultPowerShell -Encoding ASCII
+        $managedConfiguredResult = Invoke-Wrapper -FilePath $managedPowerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", '$PSVersionTable.PSEdition')
+        if ($managedConfiguredResult.ExitCode -ne 0 -or $managedConfiguredResult.Stdout -ne $expectedDefaultEdition) {
+            throw "Managed PowerShell wrapper did not honor the configured default: $($managedConfiguredResult.Stdout) $($managedConfiguredResult.Stderr)"
+        }
+
+        Set-Content -LiteralPath $managedPowerShellConfig -Value $windowsPowerShell -Encoding ASCII
+        $managedOverrideResult = Invoke-Wrapper -FilePath $managedPowerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", '$PSVersionTable.PSEdition')
+        if ($managedOverrideResult.ExitCode -ne 0 -or $managedOverrideResult.Stdout -ne "Desktop") {
+            throw "Managed PowerShell wrapper did not honor the explicit Windows PowerShell override: $($managedOverrideResult.Stdout) $($managedOverrideResult.Stderr)"
+        }
+
+        Set-Content -LiteralPath $managedPowerShellConfig -Value "" -Encoding ASCII
+        $managedFallbackResult = Invoke-Wrapper -FilePath $managedPowerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-Command", '$PSVersionTable.PSEdition')
+        if ($managedFallbackResult.ExitCode -ne 0 -or $managedFallbackResult.Stdout -ne $expectedDefaultEdition) {
+            throw "Managed PowerShell wrapper did not use the expected fallback edition: $($managedFallbackResult.Stdout) $($managedFallbackResult.Stderr)"
+        }
+    }
+
     $sleepCommand = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("Start-Sleep -Seconds 30"))
     $wrapperLockProcess = Start-Process -FilePath $powerShellWrapper -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $sleepCommand) -PassThru
-    $unrelatedPowerShellProcess = Start-Process -FilePath $realPowerShell -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $sleepCommand) -PassThru
+    $unrelatedPowerShellProcess = Start-Process -FilePath $windowsPowerShell -ArgumentList @("-NoProfile", "-NonInteractive", "-EncodedCommand", $sleepCommand) -PassThru
     try {
         $deadline = (Get-Date).AddSeconds(5)
         do {
@@ -106,7 +199,7 @@ try {
             throw "Test wrapper PowerShell process did not remain running at the expected path."
         }
 
-        & $installScript -InstallDir $testInstall -RealGit $realGit -RealPowerShell $realPowerShell -StopWrapperProcesses
+        & $installScript -InstallDir $testInstall -RealGit $realGit -RealPowerShell $windowsPowerShell -StopWrapperProcesses
 
         if (Get-Process -Id $wrapperLockProcess.Id -ErrorAction SilentlyContinue) {
             throw "Forced wrapper refresh did not stop the locked wrapper process."
@@ -162,4 +255,12 @@ finally {
         throw "Refusing to remove an unexpected test path: $testInstall"
     }
     Remove-Item -LiteralPath $testInstall -Recurse -Force -ErrorAction SilentlyContinue
+    foreach ($name in $guardEnvironmentNames) {
+        $inheritedValue = $inheritedGuardEnvironment[$name]
+        if ($null -eq $inheritedValue) {
+            Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+        } else {
+            Set-Item -LiteralPath "Env:$name" -Value $inheritedValue
+        }
+    }
 }

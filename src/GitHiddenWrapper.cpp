@@ -161,7 +161,20 @@ static TargetConfig GetTargetConfig() {
         wchar_t windowsDirectory[MAX_PATH] = {};
         GetWindowsDirectoryW(windowsDirectory, MAX_PATH);
         std::wstring systemPowerShell = std::wstring(windowsDirectory) + L"\\System32\\WindowsPowerShell\\v1.0\\powershell.exe";
-        return {L"PowerShell", L"CODEX_REAL_POWERSHELL", L"real-powershell.txt", {systemPowerShell}};
+        std::vector<std::wstring> candidates;
+        std::wstring localAppData = GetEnvironmentString(L"LOCALAPPDATA");
+        if (!localAppData.empty()) {
+            candidates.push_back(localAppData + L"\\Microsoft\\WindowsApps\\pwsh.exe");
+        }
+
+        wchar_t programFiles[MAX_PATH] = {};
+        DWORD programFilesLength = GetEnvironmentVariableW(L"ProgramFiles", programFiles, MAX_PATH);
+        if (programFilesLength > 0 && programFilesLength < MAX_PATH) {
+            candidates.push_back(std::wstring(programFiles) + L"\\PowerShell\\7\\pwsh.exe");
+        }
+
+        candidates.push_back(systemPowerShell);
+        return {L"PowerShell", L"CODEX_REAL_POWERSHELL", L"real-powershell.txt", candidates};
     }
 
     if (exeBaseName == L"cmd.exe") {

@@ -116,11 +116,18 @@ internal static class GitHiddenWrapper
         var baseName = Path.GetFileName(self);
         if (string.Equals(baseName, "powershell.exe", StringComparison.OrdinalIgnoreCase))
         {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             return new TargetInfo(
                 "PowerShell",
                 "CODEX_REAL_POWERSHELL",
                 "real-powershell.txt",
-                new[] { Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe") });
+                new[]
+                {
+                    Path.Combine(localAppData, @"Microsoft\WindowsApps\pwsh.exe"),
+                    Path.Combine(programFiles, @"PowerShell\7\pwsh.exe"),
+                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"System32\WindowsPowerShell\v1.0\powershell.exe")
+                });
         }
 
         if (string.Equals(baseName, "cmd.exe", StringComparison.OrdinalIgnoreCase))

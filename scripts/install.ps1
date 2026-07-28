@@ -262,6 +262,30 @@ function Resolve-RealPowerShell {
         return (Resolve-Path -LiteralPath $RequestedRealPowerShell).Path
     }
 
+    $powerShell7Candidates = @(
+        (Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\pwsh.exe")
+    ) + @(
+        Get-Command pwsh.exe -All -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.CommandType -eq "Application" -and
+                $_.Source -and
+                $_.Source -notlike "$WrapperInstallDir*"
+            } |
+            Select-Object -ExpandProperty Source
+    )
+
+    foreach ($candidate in ($powerShell7Candidates | Select-Object -Unique)) {
+        if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+            continue
+        }
+
+        $edition = @(& $candidate -NoLogo -NoProfile -NonInteractive -Command '$PSVersionTable.PSEdition' 2>$null) |
+            Select-Object -Last 1
+        if ($LASTEXITCODE -eq 0 -and $edition -and $edition.Trim() -eq "Core") {
+            return (Resolve-Path -LiteralPath $candidate).Path
+        }
+    }
+
     $commands = Get-Command powershell.exe -All -ErrorAction SilentlyContinue |
         Where-Object {
             $_.CommandType -eq "Application" -and
@@ -279,7 +303,7 @@ function Resolve-RealPowerShell {
         return $candidate
     }
 
-    throw "Could not detect Windows PowerShell. Pass -RealPowerShell with the full path to powershell.exe."
+    throw "Could not detect PowerShell 7 or Windows PowerShell. Pass -RealPowerShell with the full path to the intended executable."
 }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
