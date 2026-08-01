@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. Earlier history remains available in Git.
 
+## [2026-07-31]
+
+### Added
+
+- Added `scripts\codex-guard.ps1` as a single operator entry point for read-only `check`, scoped `repair`, exact-target `stop`, and recommended-switch `launch` commands, with regression coverage and bilingual documentation.
+
 ## [2026-07-16]
 
 ### Documentation

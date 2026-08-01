@@ -4,6 +4,8 @@
 
 这是一个仅适用于 **Windows** 的、可逆的本地兼容工具，用于缓解 ChatGPT Codex Desktop 工作时闪现的 `git.exe`、`powershell.exe`、`cmd.exe`、`conhost.exe`，以及空白的 Windows Terminal 窗口。
 
+项目提供统一入口 `scripts\codex-guard.ps1`，用于检查状态、查看修复候选、停止明确归属的目标，以及使用推荐开关启动 Codex。
+
 它支持当前 Microsoft Store / MSIX 包中的 `ChatGPT.exe`，也兼容旧版 `Codex.exe`。它不是 macOS/Linux 工具，也不会替换真实 Git。若已安装 PowerShell 7，wrapper 只会在 Codex 启动的 `powershell.exe` 命令中优先转发到 `pwsh.exe`；系统 Windows PowerShell 5.1 保持不变。需要兼容旧脚本时，可通过 `-RealPowerShell` 显式固定到 5.1。
 
 ## 搜索关键词
@@ -115,7 +117,7 @@ Get-Command git -All
 首次安装后，从 **外部 PowerShell** 运行：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
 ```
 
 `-Force` 会关闭当前正在运行的 ChatGPT/Codex Desktop 并重启。请先保存工作；不要在一个活跃 Codex 任务内运行它。
@@ -123,8 +125,29 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "sc
 如果 Codex 已关闭，去掉 `-Force`：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch
 ```
+
+## 统一 Codex Guard 指令
+
+日常操作统一使用一个入口：
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
+$guard = Join-Path $repo "scripts\codex-guard.ps1"
+
+& $guard check
+& $guard repair
+& $guard repair -Apply
+& $guard stop
+& $guard stop -Apply
+& $guard launch
+& $guard launch -Force
+```
+
+`check` 会合并安装状态和只读进程健康检查。`repair` 默认只预览；传入 `-Apply` 后，才会逐项处理健康检查已经识别出的 detached service root，默认还会逐项询问确认，非交互场景可同时使用 `-Force`。`stop` 默认只显示精确目标；传入 `-Apply` 后，只停止检测到的 Codex Desktop 和 Codex Windows Guard 进程，不会停止没有明确归属的 MCP、Node、浏览器、Docker 或项目开发服务器。`launch` 会自动转发 `-DisableShellSnapshot`、`-SuppressProcessSampling` 和 `-UseWindowsConsoleHost`。
+
+`launch -Force` 会关闭并重启 Codex。请先保存工作，并且只在外部 PowerShell 窗口中运行；不要在活跃 Codex 任务内运行。
 
 ## 可选开关
 
@@ -166,7 +189,7 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-& (Join-Path $repo "scripts\setup-and-start.ps1") -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
+& (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
 ```
 
 完整回滚：关闭 Codex 后，在外部 PowerShell 运行：

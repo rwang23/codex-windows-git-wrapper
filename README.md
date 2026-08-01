@@ -6,6 +6,8 @@ Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop 
 
 The canonical launcher is `scripts\start-codex-with-windows-guard.ps1`. The former console-named launcher and `scripts\start-codex-with-git-wrapper.ps1` remain compatibility forwarders for existing setups.
 
+The small `scripts\codex-guard.ps1` command entry is the preferred operator interface for checking, reviewing repair candidates, stopping exact managed targets, and launching Codex with the recommended switches.
+
 The wrapper keeps its scope inside Codex's process tree. When PowerShell 7 (`pwsh.exe`) is available, it is the default target for Codex-launched `powershell.exe` commands; Windows PowerShell 5.1 remains installed and unchanged. Pass `-RealPowerShell` with the Windows PowerShell path when a legacy task needs to pin that edition.
 
 > This is a Windows-only compatibility tool. It supports both current `ChatGPT.exe` desktop packages and older `Codex.exe` packages; it is not a macOS or Linux Git wrapper.
@@ -151,7 +153,7 @@ The installer records the real Git, PowerShell, and Command Prompt paths inside 
 After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and Windows Guard; it does not pull the repository or rebuild anything.
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling -Force
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
 ```
 
 `-Force` closes a running ChatGPT/Codex desktop process before restarting it. Save your work first, and **never run this command from an active Codex task**, because it will terminate that task.
@@ -159,8 +161,29 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "sc
 If Codex is already closed, you can omit `-Force`:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\start-codex-with-windows-guard.ps1") -DisableShellSnapshot -SuppressProcessSampling
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch
 ```
+
+## Unified Codex Guard commands
+
+Use the same entry point for the normal operator actions:
+
+```powershell
+$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
+$guard = Join-Path $repo "scripts\codex-guard.ps1"
+
+& $guard check
+& $guard repair
+& $guard repair -Apply
+& $guard stop
+& $guard stop -Apply
+& $guard launch
+& $guard launch -Force
+```
+
+`check` combines the installation report and the read-only process-health snapshot. `repair` is preview-only unless `-Apply` is supplied; it reviews only detached service roots already identified by the health snapshot and asks before each exact stop unless `-Force` is also supplied. `stop` previews and, with `-Apply`, stops only the detected Codex Desktop and Codex Windows Guard processes; it does not stop unowned MCP, Node, browser, Docker, or project development processes. `launch` forwards the default `-DisableShellSnapshot`, `-SuppressProcessSampling`, and `-UseWindowsConsoleHost` switches to `setup-and-start.ps1`.
+
+The `-Force` form closes and restarts Codex. Run it from an external PowerShell window after saving work; never run it inside an active Codex task.
 
 ## Optional: dedicated Codex temporary directory
 
@@ -179,7 +202,7 @@ You can configure the directory while starting from an external PowerShell windo
 
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-& (Join-Path $repo "scripts\setup-and-start.ps1") -TempDir "C:\CodexTemp" -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
+& (Join-Path $repo "scripts\codex-guard.ps1") launch -TempDir "C:\CodexTemp" -Force
 ```
 
 To stop using the dedicated directory without deleting its files:
@@ -208,13 +231,13 @@ Do not run `git pull` every time you launch Codex. Update only when you want a n
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 git -C $repo pull --ff-only
-& (Join-Path $repo "scripts\setup-and-start.ps1") -DisableShellSnapshot -SuppressProcessSampling -UseWindowsConsoleHost -Force
+& (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
 ```
 
 For a first-time clone-or-update from any directory, use:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-guard'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-guard.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\setup-and-start.ps1') -Force"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$repo = Join-Path $env:USERPROFILE 'codex-windows-guard'; if (-not (Test-Path -LiteralPath $repo)) { git clone https://github.com/rwang23/codex-windows-guard.git $repo } else { git -C $repo pull --ff-only }; & (Join-Path $repo 'scripts\codex-guard.ps1') launch -Force"
 ```
 
 Again, run a `-Force` command only from outside Codex.

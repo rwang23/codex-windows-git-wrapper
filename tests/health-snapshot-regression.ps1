@@ -3,6 +3,14 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $snapshotScript = Join-Path $repoRoot "scripts\health-snapshot.ps1"
 
+$hostPowerShell = (Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+if (-not $hostPowerShell) {
+    $hostPowerShell = Join-Path $env:WINDIR "System32\WindowsPowerShell\v1.0\powershell.exe"
+}
+if (-not (Test-Path -LiteralPath $hostPowerShell -PathType Leaf)) {
+    throw "A real PowerShell host is required for the health snapshot regression: $hostPowerShell"
+}
+
 if (-not (Test-Path -LiteralPath $snapshotScript -PathType Leaf)) {
     throw "Health snapshot script is missing: $snapshotScript"
 }
@@ -35,7 +43,7 @@ if ($parseErrors.Count -gt 0) {
     throw "Health snapshot has PowerShell parse errors: $($parseErrors | Out-String)"
 }
 
-$json = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -AsJson
+$json = & $hostPowerShell -NoProfile -ExecutionPolicy Bypass -File $snapshotScript -AsJson
 if ($LASTEXITCODE -ne 0) {
     throw "Health snapshot JSON execution failed with exit code $LASTEXITCODE."
 }
