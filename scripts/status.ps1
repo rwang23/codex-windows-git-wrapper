@@ -9,7 +9,7 @@ $scriptsDir = Split-Path -Parent $PSCommandPath
 $wrapper = Join-Path $InstallDir "git.exe"
 $powerShellWrapper = Join-Path $InstallDir "powershell.exe"
 $cmdWrapper = Join-Path $InstallDir "cmd.exe"
-$codeGuardCommand = Join-Path $InstallDir "codeguard.cmd"
+$codexGuardCommand = Join-Path $InstallDir "codexguard.cmd"
 $config = Join-Path $InstallDir "real-git.txt"
 $powerShellConfig = Join-Path $InstallDir "real-powershell.txt"
 $cmdConfig = Join-Path $InstallDir "real-cmd.txt"
@@ -107,14 +107,14 @@ if (Test-Path -LiteralPath $cmdConfig) {
 }
 
 Write-Output ""
-Write-Output "Codex Guard command:"
-if (Test-Path -LiteralPath $codeGuardCommand -PathType Leaf) {
+Write-Output "CodexGuard command:"
+if (Test-Path -LiteralPath $codexGuardCommand -PathType Leaf) {
     Write-Output "  Present: yes"
-    Write-Output "  Path: $codeGuardCommand"
+    Write-Output "  Path: $codexGuardCommand"
     Write-Output "  Scope: process-local Guard PATH"
 } else {
     Write-Output "  Present: no"
-    Write-Output "  Run scripts\install.ps1 to install the command shim."
+    Write-Output "  Run scripts\install.ps1 to install the codexguard command shim."
 }
 
 Write-Output ""

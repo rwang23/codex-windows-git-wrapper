@@ -252,13 +252,13 @@ function Write-Help {
 Codex Windows Guard command entry point
 
 Usage:
-  codeguard check
-  codeguard repair
-  codeguard repair -Apply
-  codeguard stop
-  codeguard stop -Apply
-  codeguard launch
-  codeguard launch -Force
+  codexguard check
+  codexguard repair
+  codexguard repair -Apply
+  codexguard stop
+  codexguard stop -Apply
+  codexguard launch
+  codexguard launch -Force
 
 Bootstrap or recovery fallback:
   powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 launch -Force
@@ -269,7 +269,7 @@ stop   Preview exact Codex Desktop/Guard targets; -Apply stops those targets.
 launch Start setup-and-start with the default Codex Guard switches.
 
 Repair and stop never target arbitrary processes by name. The health snapshot
-remains read-only. The codeguard command is installed beside the wrappers and
+remains read-only. The codexguard command is installed beside the wrappers and
 is available through the process-local PATH created by the Guard launcher.
 launch -Force must be run outside an active Codex task.
 "@ | Write-Output

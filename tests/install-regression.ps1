@@ -80,7 +80,7 @@ try {
     $gitWrapper = Join-Path $testInstall "git.exe"
     $powerShellWrapper = Join-Path $testInstall "powershell.exe"
     $cmdWrapper = Join-Path $testInstall "cmd.exe"
-    $codeGuardCommand = Join-Path $testInstall "codeguard.cmd"
+    $codexGuardCommand = Join-Path $testInstall "codexguard.cmd"
     $consoleWindowGuard = Join-Path $testInstall "codex-console-window-guard.exe"
     if (-not (Test-Path -LiteralPath $gitWrapper)) {
         throw "Git wrapper was not installed."
@@ -91,13 +91,16 @@ try {
     if (-not (Test-Path -LiteralPath $cmdWrapper)) {
         throw "Command Prompt wrapper was not installed."
     }
-    if (-not (Test-Path -LiteralPath $codeGuardCommand -PathType Leaf)) {
-        throw "CodeGuard command shim was not installed."
+    if (-not (Test-Path -LiteralPath $codexGuardCommand -PathType Leaf)) {
+        throw "CodexGuard command shim was not installed."
     }
-    $codeGuardShim = Get-Content -LiteralPath $codeGuardCommand -Raw
+    $codexGuardShim = Get-Content -LiteralPath $codexGuardCommand -Raw
     $expectedGuardScript = Join-Path $repoRoot "scripts\codex-guard.ps1"
-    if ($codeGuardShim -notmatch [regex]::Escape($expectedGuardScript)) {
-        throw "CodeGuard command shim does not point to the canonical command script."
+    if ($codexGuardShim -notmatch [regex]::Escape($expectedGuardScript)) {
+        throw "CodexGuard command shim does not point to the canonical command script."
+    }
+    if (Test-Path -LiteralPath (Join-Path $testInstall "codeguard.cmd") -PathType Leaf) {
+        throw "Legacy codeguard command shim should not remain after installation."
     }
     $buildKind = (Get-Content -LiteralPath (Join-Path $testInstall 'wrapper-kind.txt') -Raw).Trim()
     if ($buildKind -like 'native-*' -and -not (Test-Path -LiteralPath $consoleWindowGuard)) {
@@ -107,14 +110,14 @@ try {
     $originalPath = $env:Path
     try {
         $env:Path = "$testInstall;$originalPath"
-        $resolvedCodeGuard = Get-Command codeguard -All -CommandType Application -ErrorAction Stop |
+        $resolvedCodexGuard = Get-Command codexguard -All -CommandType Application -ErrorAction Stop |
             Select-Object -First 1
-        if ($resolvedCodeGuard.Source -ne $codeGuardCommand) {
-            throw "Process-local PATH did not resolve codeguard to the installed shim. Resolved: $($resolvedCodeGuard.Source)"
+        if ($resolvedCodexGuard.Source -ne $codexGuardCommand) {
+            throw "Process-local PATH did not resolve codexguard to the installed shim. Resolved: $($resolvedCodexGuard.Source)"
         }
-        $codeGuardHelp = @(& codeguard help)
-        if ($LASTEXITCODE -ne 0 -or ($codeGuardHelp -join "`n") -notmatch "codeguard check") {
-            throw "Installed codeguard command did not execute the canonical help output."
+        $codexGuardHelp = @(& codexguard help)
+        if ($LASTEXITCODE -ne 0 -or ($codexGuardHelp -join "`n") -notmatch "codexguard check") {
+            throw "Installed codexguard command did not execute the canonical help output."
         }
     }
     finally {
@@ -156,7 +159,12 @@ try {
         throw "PowerShell wrapper did not use the expected default edition: $($defaultEditionResult.Stdout) $($defaultEditionResult.Stderr)"
     }
 
+    $legacyCommand = Join-Path $testInstall "codeguard.cmd"
+    Set-Content -LiteralPath $legacyCommand -Value "legacy" -Encoding ASCII
     & $installScript -InstallDir $testInstall -RealPowerShell $windowsPowerShell
+    if (Test-Path -LiteralPath $legacyCommand -PathType Leaf) {
+        throw "Installer did not remove the legacy codeguard command shim."
+    }
     $configuredOverridePowerShell = (Get-Content -LiteralPath (Join-Path $testInstall 'real-powershell.txt') -Raw).Trim()
     if ($configuredOverridePowerShell -ne $windowsPowerShell) {
         throw "Installer did not preserve the explicit Windows PowerShell override. Expected: $windowsPowerShell; Actual: $configuredOverridePowerShell"

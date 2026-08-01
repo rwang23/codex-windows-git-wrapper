@@ -33,7 +33,7 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 - Keep the guard narrowly scoped to an exact window owner/process graph: targeted shell owners under ChatGPT/Codex, packaged Codex backend/helper owners under `ChatGPT.exe`, or a Chrome-parented `cmd.exe` native-host bridge. Never hide arbitrary descendants or all windows of a generic class.
 - Preserve the bounded, command-line-free guard log and its 1 MiB truncation limit.
 - Keep the health snapshot observation-only. It may read process, package, listener, and daemon-registration state, but must never start, stop, suspend, or modify anything; it must not serialize command lines or daemon tokens.
-- Keep `codeguard check` read-only. `repair` and `stop` are preview-only unless `-Apply` is explicit; `launch -Force` must be run from an external PowerShell window, never inside an active Codex task. The `codeguard` shim is process-local; do not add the wrapper directory to persistent PATH or install a hook.
+- Keep `codexguard check` read-only. `repair` and `stop` are preview-only unless `-Apply` is explicit; `launch -Force` must be run from an external PowerShell window, never inside an active Codex task. The `codexguard` shim is process-local; do not add the wrapper directory to persistent PATH.
 - Preserve the sparse startup/30-second rescan schedule and its visible-candidate gate; do not turn the guard into another high-frequency process poller.
 - Preserve normal PowerShell Git behavior. Do not turn the system Git executable into a GUI executable.
 - `-Force` stops Codex. Never run it from an active Codex task; give the user an external PowerShell command instead.
@@ -62,11 +62,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\status.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\health-snapshot.ps1 -AsJson
 
 # Unified operator entry point after Guard launch
-codeguard check
-codeguard repair
-codeguard stop
-codeguard launch
-codeguard launch -Force
+codexguard check
+codexguard repair
+codexguard stop
+codexguard launch
+codexguard launch -Force
 
 # Bootstrap/recovery fallback from an external PowerShell window
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 launch -Force
@@ -86,7 +86,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\health-snapshot-regr
 - Guard filter: simulate both desktop process names, verify `--once` exits after the expected console event, run the process-graph self-test, and verify the matched-window log.
 - Health snapshot: execute both human and JSON views, enforce the read-only command boundary, and confirm command lines and daemon tokens are absent.
 - Unified command entry: run `tests\codex-guard-regression.ps1`, the read-only `check`, and the affected focused regression checks.
-- Documentation: no machine-specific clone paths, no secrets, and no undocumented safety trade-offs.
+- Documentation: no machine-specific clone paths, no secrets, and no undocumented safety trade-offs. First-time setup must change only the `$guardRepo` example variable when the clone is elsewhere; never ask users to edit script internals.
 - Release: run all focused regression checks, `git diff --check`, and `workflow-lint.ps1` before push.
 
 ## Verification Bundles
@@ -105,7 +105,7 @@ This project has no production service or customer data. Before a public GitHub 
 - `scripts\install.ps1`: builds/installs local wrappers and the optional guard.
 - `scripts\start-codex-with-windows-guard.ps1`: canonical launcher for the process-local wrapper environment and console guard.
 - `scripts\start-codex-with-git-wrapper.ps1`: compatibility forwarder for older commands; new docs must use the canonical launcher.
-- `scripts\codex-guard.ps1`: one operator entry point for `check`, preview/apply `repair`, preview/apply exact-target `stop`, and recommended-switch `launch`.
+- `scripts\codex-guard.ps1`: underlying operator entry point invoked by the `codexguard` shim for `check`, preview/apply `repair`, preview/apply exact-target `stop`, and recommended-switch `launch`.
 - `scripts\status.ps1`: read-only install/runtime diagnostics.
 - `scripts\health-snapshot.ps1`: read-only Codex app-server, stdio/MCP service-root, detached-candidate, memory, and BB Browser daemon diagnostics.
 - `docs\codex-desktop-performance-runbook.zh-CN.md`: dated evidence, explanation, upgrade checks, activation boundaries, and rollback for the Windows multi-task performance investigation.
