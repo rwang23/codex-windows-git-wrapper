@@ -33,7 +33,7 @@ Do not inspect generated `bin/` or `obj/` output unless build diagnosis requires
 - Keep the guard narrowly scoped to an exact window owner/process graph: targeted shell owners under ChatGPT/Codex, packaged Codex backend/helper owners under `ChatGPT.exe`, or a Chrome-parented `cmd.exe` native-host bridge. Never hide arbitrary descendants or all windows of a generic class.
 - Preserve the bounded, command-line-free guard log and its 1 MiB truncation limit.
 - Keep the health snapshot observation-only. It may read process, package, listener, and daemon-registration state, but must never start, stop, suspend, or modify anything; it must not serialize command lines or daemon tokens.
-- Keep `scripts\codex-guard.ps1 check` read-only. `repair` and `stop` are preview-only unless `-Apply` is explicit; `launch -Force` must be run from an external PowerShell window, never inside an active Codex task.
+- Keep `codeguard check` read-only. `repair` and `stop` are preview-only unless `-Apply` is explicit; `launch -Force` must be run from an external PowerShell window, never inside an active Codex task. The `codeguard` shim is process-local; do not add the wrapper directory to persistent PATH or install a hook.
 - Preserve the sparse startup/30-second rescan schedule and its visible-candidate gate; do not turn the guard into another high-frequency process poller.
 - Preserve normal PowerShell Git behavior. Do not turn the system Git executable into a GUI executable.
 - `-Force` stops Codex. Never run it from an active Codex task; give the user an external PowerShell command instead.
@@ -61,11 +61,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\status.ps1
 # Read-only process health
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\health-snapshot.ps1 -AsJson
 
-# Unified operator entry point
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 check
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 repair
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 stop
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 launch
+# Unified operator entry point after Guard launch
+codeguard check
+codeguard repair
+codeguard stop
+codeguard launch
+codeguard launch -Force
+
+# Bootstrap/recovery fallback from an external PowerShell window
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\codex-guard.ps1 launch -Force
 
 # Focused regression checks

@@ -7,6 +7,7 @@ All notable changes to this project are documented here. Earlier history remains
 ### Added
 
 - Added `scripts\codex-guard.ps1` as a single operator entry point for read-only `check`, scoped `repair`, exact-target `stop`, and recommended-switch `launch` commands, with regression coverage and bilingual documentation.
+- Added the `codeguard.cmd` shim to the process-local Guard wrapper directory, so normal Codex-launched terminals use `codeguard check|repair|stop|launch` without a persistent PATH change or background hook.
 
 ## [2026-07-16]
 

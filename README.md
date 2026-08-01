@@ -6,7 +6,7 @@ Small, reversible workaround for **Windows** users of the ChatGPT Codex desktop 
 
 The canonical launcher is `scripts\start-codex-with-windows-guard.ps1`. The former console-named launcher and `scripts\start-codex-with-git-wrapper.ps1` remain compatibility forwarders for existing setups.
 
-The small `scripts\codex-guard.ps1` command entry is the preferred operator interface for checking, reviewing repair candidates, stopping exact managed targets, and launching Codex with the recommended switches.
+The installer also creates a small `codeguard` command shim beside the process-local wrappers. After Codex is launched through Guard, the normal operator interface is `codeguard check`, `codeguard repair`, `codeguard stop`, and `codeguard launch`; the script path is only a bootstrap or recovery fallback.
 
 The wrapper keeps its scope inside Codex's process tree. When PowerShell 7 (`pwsh.exe`) is available, it is the default target for Codex-launched `powershell.exe` commands; Windows PowerShell 5.1 remains installed and unchanged. Pass `-RealPowerShell` with the Windows PowerShell path when a legacy task needs to pin that edition.
 
@@ -107,8 +107,8 @@ The default install location is `%LOCALAPPDATA%\OpenAI\Codex\wrapper-bin`, outsi
 
 ## How it works
 
-1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory. They forward arguments, standard streams, and exit codes to the real executables without creating a console window.
-2. `scripts\start-codex-with-windows-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`.
+1. `scripts\install.ps1` builds small GUI wrappers named `git.exe`, `powershell.exe`, and `cmd.exe` in the wrapper directory, plus `codeguard.cmd` pointing to the canonical Guard command script. The wrappers forward arguments, standard streams, and exit codes to the real executables without creating a console window.
+2. `scripts\start-codex-with-windows-guard.ps1` starts Codex with that directory at the front of its **process-local** `PATH`, so child terminals resolve `codeguard` without a persistent PATH entry or a hook.
 3. When a native C++ compiler is available, the installer also builds `codex-console-window-guard.exe`. The guard covers MSIX activation paths that bypass the local `PATH`: it observes new top-level windows and uses a sparse startup/30-second rescan so process-ancestry races and persistent blank helper windows are not missed. A rescan reads the process graph only after it finds a visible candidate window, avoiding idle process-table polling.
 4. For systems where Windows Terminal delegation creates blank brokered windows, the explicit `-UseWindowsConsoleHost` switch selects the OS-supported legacy console host for unbound console launches. In the captured brokered-window symptom class, this avoids the Windows Terminal/OpenConsole delegation path without globally hiding `WindowsTerminal.exe`, which could also hide legitimate user terminals. The two GUID values follow Microsoft's documented [Default terminal application policy](https://learn.microsoft.com/windows/terminal/group-policy#default-terminal-application).
 5. The launcher reads the installed MSIX manifest rather than hard-coding the executable name. It therefore handles current `app\ChatGPT.exe` and older `app\Codex.exe` layouts.
@@ -150,7 +150,7 @@ The installer records the real Git, PowerShell, and Command Prompt paths inside 
 
 ## Daily launch: one copy-paste command, no `cd`, no `git pull`
 
-After the first install, use this command from an **external PowerShell window**. It starts the existing wrappers and Windows Guard; it does not pull the repository or rebuild anything.
+The long script-path form below is only the bootstrap/recovery fallback. Run it from an **external PowerShell window** after the first install; it starts the existing wrappers and Windows Guard but does not pull the repository or rebuild anything.
 
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
@@ -166,24 +166,21 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "sc
 
 ## Unified Codex Guard commands
 
-Use the same entry point for the normal operator actions:
+Use the short command after Codex has been launched through Guard:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-$guard = Join-Path $repo "scripts\codex-guard.ps1"
-
-& $guard check
-& $guard repair
-& $guard repair -Apply
-& $guard stop
-& $guard stop -Apply
-& $guard launch
-& $guard launch -Force
+codeguard check
+codeguard repair
+codeguard repair -Apply
+codeguard stop
+codeguard stop -Apply
+codeguard launch
+codeguard launch -Force
 ```
 
 `check` combines the installation report and the read-only process-health snapshot. `repair` is preview-only unless `-Apply` is supplied; it reviews only detached service roots already identified by the health snapshot and asks before each exact stop unless `-Force` is also supplied. `stop` previews and, with `-Apply`, stops only the detected Codex Desktop and Codex Windows Guard processes; it does not stop unowned MCP, Node, browser, Docker, or project development processes. `launch` forwards the default `-DisableShellSnapshot`, `-SuppressProcessSampling`, and `-UseWindowsConsoleHost` switches to `setup-and-start.ps1`.
 
-The `-Force` form closes and restarts Codex. Run it from an external PowerShell window after saving work; never run it inside an active Codex task.
+The shim is visible through Guard's process-local PATH only; the installer does not change user or system PATH and does not install a background hook. The `-Force` form closes and restarts Codex. Run `launch` from an external PowerShell window after saving work; never run it inside an active Codex task.
 
 ## Optional: dedicated Codex temporary directory
 
@@ -201,8 +198,7 @@ The one-shell snippet commonly shared for `codex -C ...` is useful for the stand
 You can configure the directory while starting from an external PowerShell window:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-& (Join-Path $repo "scripts\codex-guard.ps1") launch -TempDir "C:\CodexTemp" -Force
+codeguard launch -TempDir "C:\CodexTemp" -Force
 ```
 
 To stop using the dedicated directory without deleting its files:
@@ -231,7 +227,7 @@ Do not run `git pull` every time you launch Codex. Update only when you want a n
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 git -C $repo pull --ff-only
-& (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
+codeguard launch -Force
 ```
 
 For a first-time clone-or-update from any directory, use:
@@ -244,13 +240,13 @@ Again, run a `-Force` command only from outside Codex.
 
 ## Check status and remove the workaround
 
-Status:
+Status and read-only health:
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\status.ps1")
+codeguard check
 ```
 
-The status report includes the detected app package, wrapper install path, real Git path, current default-terminal mode, dedicated-wrapper TEMP status, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
+The report includes the detected app package, wrapper install path, `codeguard` shim scope, real Git path, current default-terminal mode, dedicated-wrapper TEMP status, console-guard presence/running state, recent guard-log matches, current Git resolution, persistent `PATH` checks, and running Codex processes.
 
 ### Read-only process health snapshot
 

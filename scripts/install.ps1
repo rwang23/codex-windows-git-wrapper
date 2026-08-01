@@ -306,12 +306,35 @@ function Resolve-RealPowerShell {
     throw "Could not detect PowerShell 7 or Windows PowerShell. Pass -RealPowerShell with the full path to the intended executable."
 }
 
+function Write-CodeGuardCommandShim {
+    param(
+        [string]$Output,
+        [string]$GuardScript,
+        [string]$PowerShellPath
+    )
+
+    # The shim is deliberately installed beside the process-local wrappers. Do
+    # not add that directory to persistent user or machine PATH.
+    $cmdPowerShellPath = $PowerShellPath.Replace('%', '%%')
+    $cmdGuardScript = $GuardScript.Replace('%', '%%')
+    $lines = @(
+        '@echo off',
+        "`"$cmdPowerShellPath`" -NoProfile -ExecutionPolicy Bypass -File `"$cmdGuardScript`" %*",
+        'exit /b %ERRORLEVEL%'
+    )
+    Set-Content -LiteralPath $Output -Value $lines -Encoding ASCII
+}
+
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $source = Join-Path $repoRoot "src\GitHiddenWrapper.cs"
 $nativeSource = Join-Path $repoRoot "src\GitHiddenWrapper.cpp"
 $consoleWindowGuardSource = Join-Path $repoRoot "src\CodexConsoleWindowGuard.cpp"
+$codeGuardScript = Join-Path $repoRoot "scripts\codex-guard.ps1"
 if (-not (Test-Path -LiteralPath $source)) {
     throw "Wrapper source was not found: $source"
+}
+if (-not (Test-Path -LiteralPath $codeGuardScript -PathType Leaf)) {
+    throw "Codex Guard command script was not found: $codeGuardScript"
 }
 
 $resolvedRealGit = Resolve-RealGit -RequestedRealGit $RealGit -WrapperInstallDir $InstallDir
@@ -352,6 +375,7 @@ Copy-Item -LiteralPath $output -Destination $powerShellOutput -Force
 $cmdOutput = Join-Path $InstallDir "cmd.exe"
 Copy-Item -LiteralPath $output -Destination $cmdOutput -Force
 $consoleWindowGuardOutput = Join-Path $InstallDir "codex-console-window-guard.exe"
+$codeGuardOutput = Join-Path $InstallDir "codeguard.cmd"
 
 if ($nativeCompiler -and (Test-Path -LiteralPath $consoleWindowGuardSource)) {
     $existingGuards = Get-Process -Name "codex-console-window-guard" -ErrorAction SilentlyContinue |
@@ -371,6 +395,7 @@ Set-Content -LiteralPath (Join-Path $InstallDir "real-git.txt") -Value $resolved
 Set-Content -LiteralPath (Join-Path $InstallDir "real-powershell.txt") -Value $resolvedRealPowerShell -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "real-cmd.txt") -Value $resolvedRealCmd -Encoding ASCII
 Set-Content -LiteralPath (Join-Path $InstallDir "wrapper-kind.txt") -Value $buildKind -Encoding ASCII
+Write-CodeGuardCommandShim -Output $codeGuardOutput -GuardScript $codeGuardScript -PowerShellPath $resolvedRealPowerShell
 
 Write-Output "Installed Codex Windows Guard."
 Write-Output "Wrapper:  $output"
@@ -382,6 +407,7 @@ if (Test-Path -LiteralPath $consoleWindowGuardOutput) {
     Write-Warning "Native guard was not built because no native C++ compiler was available."
 }
 Write-Output "Build:    $buildKind"
+Write-Output "CodeGuard command: $codeGuardOutput"
 Write-Output "Real Git: $resolvedRealGit"
 Write-Output "Real PowerShell: $resolvedRealPowerShell"
 Write-Output "Real Command Prompt: $resolvedRealCmd"
@@ -389,3 +415,4 @@ Write-Output "Version:  $gitVersion"
 Write-Output "PowerShell version: $powerShellVersion"
 Write-Output ""
 Write-Output "Next: close Codex, then run scripts\start-codex-with-windows-guard.ps1"
+Write-Output "After Guard launch, use: codeguard check|repair|stop|launch"

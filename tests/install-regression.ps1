@@ -80,6 +80,7 @@ try {
     $gitWrapper = Join-Path $testInstall "git.exe"
     $powerShellWrapper = Join-Path $testInstall "powershell.exe"
     $cmdWrapper = Join-Path $testInstall "cmd.exe"
+    $codeGuardCommand = Join-Path $testInstall "codeguard.cmd"
     $consoleWindowGuard = Join-Path $testInstall "codex-console-window-guard.exe"
     if (-not (Test-Path -LiteralPath $gitWrapper)) {
         throw "Git wrapper was not installed."
@@ -90,9 +91,34 @@ try {
     if (-not (Test-Path -LiteralPath $cmdWrapper)) {
         throw "Command Prompt wrapper was not installed."
     }
+    if (-not (Test-Path -LiteralPath $codeGuardCommand -PathType Leaf)) {
+        throw "CodeGuard command shim was not installed."
+    }
+    $codeGuardShim = Get-Content -LiteralPath $codeGuardCommand -Raw
+    $expectedGuardScript = Join-Path $repoRoot "scripts\codex-guard.ps1"
+    if ($codeGuardShim -notmatch [regex]::Escape($expectedGuardScript)) {
+        throw "CodeGuard command shim does not point to the canonical command script."
+    }
     $buildKind = (Get-Content -LiteralPath (Join-Path $testInstall 'wrapper-kind.txt') -Raw).Trim()
     if ($buildKind -like 'native-*' -and -not (Test-Path -LiteralPath $consoleWindowGuard)) {
         throw "Console window guard was not installed with the native wrapper build."
+    }
+
+    $originalPath = $env:Path
+    try {
+        $env:Path = "$testInstall;$originalPath"
+        $resolvedCodeGuard = Get-Command codeguard -All -CommandType Application -ErrorAction Stop |
+            Select-Object -First 1
+        if ($resolvedCodeGuard.Source -ne $codeGuardCommand) {
+            throw "Process-local PATH did not resolve codeguard to the installed shim. Resolved: $($resolvedCodeGuard.Source)"
+        }
+        $codeGuardHelp = @(& codeguard help)
+        if ($LASTEXITCODE -ne 0 -or ($codeGuardHelp -join "`n") -notmatch "codeguard check") {
+            throw "Installed codeguard command did not execute the canonical help output."
+        }
+    }
+    finally {
+        $env:Path = $originalPath
     }
 
     $configuredGit = (Get-Content -LiteralPath (Join-Path $testInstall 'real-git.txt') -Raw).Trim()

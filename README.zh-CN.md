@@ -4,7 +4,7 @@
 
 这是一个仅适用于 **Windows** 的、可逆的本地兼容工具，用于缓解 ChatGPT Codex Desktop 工作时闪现的 `git.exe`、`powershell.exe`、`cmd.exe`、`conhost.exe`，以及空白的 Windows Terminal 窗口。
 
-项目提供统一入口 `scripts\codex-guard.ps1`，用于检查状态、查看修复候选、停止明确归属的目标，以及使用推荐开关启动 Codex。
+安装器还会在 process-local wrapper 目录旁创建一个简短的 `codeguard` 命令 shim。Codex 通过 Guard 启动后，日常统一使用 `codeguard check`、`codeguard repair`、`codeguard stop` 和 `codeguard launch`；脚本路径只作为首次引导或恢复时的备用入口。
 
 它支持当前 Microsoft Store / MSIX 包中的 `ChatGPT.exe`，也兼容旧版 `Codex.exe`。它不是 macOS/Linux 工具，也不会替换真实 Git。若已安装 PowerShell 7，wrapper 只会在 Codex 启动的 `powershell.exe` 命令中优先转发到 `pwsh.exe`；系统 Windows PowerShell 5.1 保持不变。需要兼容旧脚本时，可通过 `-RealPowerShell` 显式固定到 5.1。
 
@@ -114,7 +114,7 @@ Get-Command git -All
 
 ## 日常启动：一行命令，无需 `cd` 或 `git pull`
 
-首次安装后，从 **外部 PowerShell** 运行：
+下面这条较长的脚本路径命令只用于首次引导或恢复。首次安装后，请从 **外部 PowerShell** 运行：
 
 ```powershell
 $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
@@ -130,24 +130,21 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"; & (Join-Path $repo "sc
 
 ## 统一 Codex Guard 指令
 
-日常操作统一使用一个入口：
+Codex 通过 Guard 启动后，日常操作直接使用短命令：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-$guard = Join-Path $repo "scripts\codex-guard.ps1"
-
-& $guard check
-& $guard repair
-& $guard repair -Apply
-& $guard stop
-& $guard stop -Apply
-& $guard launch
-& $guard launch -Force
+codeguard check
+codeguard repair
+codeguard repair -Apply
+codeguard stop
+codeguard stop -Apply
+codeguard launch
+codeguard launch -Force
 ```
 
 `check` 会合并安装状态和只读进程健康检查。`repair` 默认只预览；传入 `-Apply` 后，才会逐项处理健康检查已经识别出的 detached service root，默认还会逐项询问确认，非交互场景可同时使用 `-Force`。`stop` 默认只显示精确目标；传入 `-Apply` 后，只停止检测到的 Codex Desktop 和 Codex Windows Guard 进程，不会停止没有明确归属的 MCP、Node、浏览器、Docker 或项目开发服务器。`launch` 会自动转发 `-DisableShellSnapshot`、`-SuppressProcessSampling` 和 `-UseWindowsConsoleHost`。
 
-`launch -Force` 会关闭并重启 Codex。请先保存工作，并且只在外部 PowerShell 窗口中运行；不要在活跃 Codex 任务内运行。
+shim 只通过 Guard 的进程级 PATH 提供，不修改用户或系统 PATH，也不安装后台 hook。`launch -Force` 会关闭并重启 Codex。请先保存工作，从外部 PowerShell 窗口运行 `launch`；不要在活跃 Codex 任务内运行。
 
 ## 可选开关
 
@@ -178,18 +175,16 @@ $repo = Join-Path $env:USERPROFILE "codex-windows-guard"
 
 如果问题是多个长期任务下的 CPU、内存或 stdio/MCP 进程增长，请先阅读 [Codex Desktop Windows 性能诊断与优化运行手册](docs/codex-desktop-performance-runbook.zh-CN.md)。其中记录了本次 CodeGraph、Node REPL、MCP、pre-compact hook、BB Browser 与 Docker/WSL 调整的原理、升级后检查和回滚方式。
 
-查看状态：
+查看状态和只读健康信息：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-& (Join-Path $repo "scripts\status.ps1")
+codeguard check
 ```
 
 需要更新或修复安装时，再运行：
 
 ```powershell
-$repo = Join-Path $env:USERPROFILE "codex-windows-guard"
-& (Join-Path $repo "scripts\codex-guard.ps1") launch -Force
+codeguard launch -Force
 ```
 
 完整回滚：关闭 Codex 后，在外部 PowerShell 运行：
